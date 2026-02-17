@@ -4,6 +4,8 @@ import struct
 import sys
 import json
 import os
+import random
+import zlib
 
 # --- Configuration ---
 PORT = 'COM5'  # Change to your RX port
@@ -37,14 +39,15 @@ def main():
                     time.sleep(0.5)
                     continue
 
-                sync_data = ser.read(6)
-                if len(sync_data) < 6:
+                sync_data = ser.read(10)  # MTU (2) + GAP (4) + SEED (4)
+                if len(sync_data) < 10:
                     continue
-                    
-                current_mtu, current_gap = struct.unpack('<H f', sync_data)
+
+                current_mtu, current_gap, random_seed = struct.unpack('<H f I', sync_data)
                 gap_ms = int(current_gap * 1000)
-                
+
                 packets_received = 0
+                crc_failures = 0
                 bytes_received = 0
                 start_time = time.time()
                 last_packet_time = time.time()
@@ -77,11 +80,26 @@ def main():
                             packet = packet_buffer[:current_mtu]
                             packet_buffer = packet_buffer[current_mtu:]
 
+                            # Parse packet: start byte (1) + seq (4) + payload + crc32 (4)
+                            seq_num = struct.unpack('<I', packet[1:5])[0]
+                            payload = packet[5:-4]
+                            received_crc32 = struct.unpack('<I', packet[-4:])[0]
+
+                            # Regenerate expected payload
+                            rng = random.Random(random_seed + seq_num)
+                            expected_payload = bytes([rng.randint(0, 255) for _ in range(len(payload))])
+
+                            # Verify CRC32
+                            expected_crc32 = zlib.crc32(expected_payload) & 0xFFFFFFFF
+
+                            if received_crc32 != expected_crc32:
+                                crc_failures += 1
+
                             packets_received += 1
                             bytes_received += current_mtu
                             last_packet_time = time.time()
 
-                            sys.stdout.write(f"\r-> Receiving [{current_mtu}B@{gap_ms}ms]: {packets_received}/{PACKETS_PER_TEST}")
+                            sys.stdout.write(f"\r-> Receiving [{current_mtu}B@{gap_ms}ms]: {packets_received}/{PACKETS_PER_TEST} [CRC Fail: {crc_failures}]")
                             sys.stdout.flush()
 
                             if packets_received == PACKETS_PER_TEST:
@@ -97,20 +115,25 @@ def main():
 
                 # Restore timeout for SYNC detection
                 ser.timeout = 5.0
-                
+
                 # 3. Batch complete: Calculate metrics
                 elapsed = last_packet_time - start_time
                 rf_throughput = bytes_received / elapsed if elapsed > 0 else 0
                 loss_percent = ((PACKETS_PER_TEST - packets_received) / PACKETS_PER_TEST) * 100
+                crc_failure_percent = (crc_failures / packets_received * 100) if packets_received > 0 else 0
 
                 # Calculate expected throughput based on air gap
                 expected_time = packets_received * current_gap
                 expected_throughput = bytes_received / expected_time if expected_time > 0 else 0
 
+                # Send ACK to transmitter
+                ser.write(b'ACK')
+                ser.flush()
+
                 # Clear any remaining packet data before next test
                 ser.reset_input_buffer()
 
-                print(f"\n   [RESULT] Loss: {loss_percent:.1f}% | RF Speed: {rf_throughput:.2f} B/s | Expected: {expected_throughput:.2f} B/s")
+                print(f"\n   [RESULT] Loss: {loss_percent:.1f}% | CRC Fail: {crc_failure_percent:.1f}% | RF Speed: {rf_throughput:.2f} B/s | Expected: {expected_throughput:.2f} B/s")
 
                 # 4. Save results to dictionary and file
                 mtu_key = str(current_mtu)  # JSON keys must be strings
@@ -122,6 +145,8 @@ def main():
                     'rf_throughput': rf_throughput,
                     'expected_throughput': expected_throughput,
                     'loss': loss_percent,
+                    'crc_failures': crc_failures,
+                    'crc_failure_percent': crc_failure_percent,
                     'packets_received': packets_received,
                     'packets_expected': PACKETS_PER_TEST
                 })

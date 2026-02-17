@@ -1,6 +1,8 @@
 import serial
 import time
 import struct
+import random
+import zlib
 
 # --- Configuration ---
 PORT = 'COM4'  # Change to your TX port
@@ -13,27 +15,48 @@ AIR_GAPS = [0.005,0.01, 0.02, 0.03] # Seconds
 
 def send_test_batch(ser, mtu, gap):
     print(f"\n--- Testing MTU: {mtu} bytes | Air Gap: {gap*1000:.1f} ms ---")
-    
+
+    # Generate random seed for this batch
+    random_seed = random.randint(0, 2**32 - 1)
+
     # Send SYNC header
-    # Format: 'SYNC' + MTU (unsigned short) + GAP (float)
-    sync_packet = b'SYNC' + struct.pack('<H f', mtu, gap)
+    # Format: 'SYNC' + MTU (unsigned short) + GAP (float) + SEED (unsigned int)
+    sync_packet = b'SYNC' + struct.pack('<H f I', mtu, gap, random_seed)
     ser.write(sync_packet)
+    ser.flush()
     time.sleep(1.5) # Give receiver time to parse SYNC and get ready
-    
+
     for seq in range(PACKETS_PER_TEST):
-        # Packet: Start Byte (1) + Seq Num (4) + Dummy Payload
-        payload_size = mtu - 5
-        
-        # Pack sequence number and pad with 0xBB
-        packet = struct.pack('<B I', 0xAA, seq) + (b'\xBB' * payload_size)
+        # Packet: Start Byte (1) + Seq Num (4) + Random Payload + CRC32 (4)
+        # So payload_size = mtu - 1 - 4 - 4 = mtu - 9
+        payload_size = mtu - 9
+
+        # Generate deterministic random payload based on seed and sequence
+        rng = random.Random(random_seed + seq)
+        random_payload = bytes([rng.randint(0, 255) for _ in range(payload_size)])
+
+        # Calculate CRC32 of the payload
+        crc32 = zlib.crc32(random_payload) & 0xFFFFFFFF
+
+        # Pack packet: start byte + seq + payload + crc32
+        packet = struct.pack('<B I', 0xAA, seq) + random_payload + struct.pack('<I', crc32)
         ser.write(packet)
         ser.flush()  # Wait until all bytes are actually transmitted over serial
 
         # Real-time console update on transmitter
         print(f"\rSending packet {seq+1}/{PACKETS_PER_TEST}...", end='', flush=True)
         time.sleep(gap)
-        
+
     print(" Done.")
+
+    # Wait for ACK from receiver
+    print("Waiting for ACK from receiver...", end='', flush=True)
+    ser.timeout = 5.0
+    ack = ser.read(3)
+    if ack == b'ACK':
+        print(" Received ACK!")
+    else:
+        print(f" No ACK received (got: {ack})")
 
 def main():
     try:
