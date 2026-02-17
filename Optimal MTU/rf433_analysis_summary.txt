@@ -1,0 +1,114 @@
+
+======================================================================
+RF433 PERFORMANCE BENCHMARK SUMMARY
+======================================================================
+Test Date: 2026-02-17 15:21:35
+Baudrate: 9600 bps
+Packets per test: 100
+
+======================================================================
+OPTIMAL CONFIGURATION (Best Efficiency Score)
+======================================================================
+MTU Size:          128 bytes
+Air Gap:           19 ms
+RF Throughput:     853.32 B/s
+Packet Loss:       1.0%
+CRC Failures:      0.0%
+Reliability:       99.0%
+Efficiency Score:  0.845
+
+======================================================================
+ALTERNATIVE CONFIGURATIONS
+======================================================================
+
+Best Raw Throughput:
+  MTU: 256B @ 9ms
+  Throughput: 886.23 B/s
+  Loss: 2.0%, CRC Fail: 5.1%
+
+Best Reliability (100% delivery, 0% corruption):
+  MTU: 16B @ 4ms
+  Throughput: 493.09 B/s
+  Loss: 0.0%, CRC Fail: 0.0%
+
+======================================================================
+PERFORMANCE BY MTU SIZE
+======================================================================
+
+MTU 16 bytes:
+  Avg Throughput: 444.23 B/s
+  Avg Loss: 0.0%
+  Avg CRC Failures: 0.0%
+  Status: EXCELLENT - Perfect delivery
+
+MTU 32 bytes:
+  Avg Throughput: 650.84 B/s
+  Avg Loss: 0.0%
+  Avg CRC Failures: 0.0%
+  Status: EXCELLENT - Perfect delivery
+
+MTU 64 bytes:
+  Avg Throughput: 773.19 B/s
+  Avg Loss: 0.0%
+  Avg CRC Failures: 0.0%
+  Status: EXCELLENT - Perfect delivery
+
+MTU 128 bytes:
+  Avg Throughput: 852.82 B/s
+  Avg Loss: 1.0%
+  Avg CRC Failures: 0.0%
+  Status: VERY GOOD - Minimal loss, no corruption
+
+MTU 256 bytes:
+  Avg Throughput: 885.70 B/s
+  Avg Loss: 2.2%
+  Avg CRC Failures: 3.6%
+  Status: ACCEPTABLE - Some loss and corruption
+
+MTU 512 bytes:
+  Avg Throughput: 882.30 B/s
+  Avg Loss: 5.2%
+  Avg CRC Failures: 12.7%
+  Status: POOR - Significant degradation
+
+MTU 1024 bytes:
+  Avg Throughput: 873.01 B/s
+  Avg Loss: 84.0%
+  Avg CRC Failures: 6.2%
+  Status: CRITICAL - System failure
+
+======================================================================
+KEY FINDINGS
+======================================================================
+1. Viable MTU Range: 16-128 bytes for reliable operation
+2. Critical Threshold: System breaks down at 256+ bytes
+3. Buffer Overflow: Complete failure at 1024+ bytes (84% loss)
+4. Data Corruption: CRC failures increase with MTU size
+   - 16-128 bytes: 0% corruption
+   - 256 bytes: 3-5% corruption
+   - 512 bytes: 8-16% corruption
+
+5. Root Cause: RF module buffer overflow
+   - At 9600 baud, large packets take >1 second to transmit
+   - Air gaps (4-29ms) too short for RF transmission time
+   - Serial port sends faster than RF can transmit
+
+======================================================================
+RECOMMENDATIONS
+======================================================================
+For Maximum Reliability:
+  - Use MTU <= 64 bytes
+  - Air gap: Any (4-29ms all work well)
+  - Expected: 0% loss, 0% corruption
+
+For Best Performance:
+  - Use MTU = 128 bytes
+  - Air gap: 19 ms
+  - Expected: 853 B/s throughput
+
+For Large Packet Support:
+  - Implement adaptive air gaps based on MTU size
+  - Required delay = (MTU x 10 bits / 9600) + safety margin
+  - Example: 1024B needs >=1.1 second gap
+
+======================================================================
