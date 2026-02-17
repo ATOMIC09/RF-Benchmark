@@ -2,7 +2,7 @@
   "16": [
     {
       "gap_ms": 4,
-      "rf_throughput": 495.2726089758407,
+      "rf_throughput": 495.49187057660254,
       "expected_throughput": 3200.0000715255755,
       "loss": 0.0,
       "packets_received": 100,
@@ -10,7 +10,7 @@
     },
     {
       "gap_ms": 9,
-      "rf_throughput": 492.6831098308426,
+      "rf_throughput": 495.24406366772405,
       "expected_throughput": 1600.0000357627878,
       "loss": 0.0,
       "packets_received": 100,
@@ -18,7 +18,7 @@
     },
     {
       "gap_ms": 19,
-      "rf_throughput": 448.62815797353284,
+      "rf_throughput": 446.7120246914583,
       "expected_throughput": 800.0000178813939,
       "loss": 0.0,
       "packets_received": 100,
@@ -26,7 +26,7 @@
     },
     {
       "gap_ms": 29,
-      "rf_throughput": 349.8385299213968,
+      "rf_throughput": 349.9273305797186,
       "expected_throughput": 533.3333452542626,
       "loss": 0.0,
       "packets_received": 100,
@@ -36,15 +36,15 @@
   "32": [
     {
       "gap_ms": 4,
-      "rf_throughput": 643.1030274204314,
+      "rf_throughput": 652.0646854064996,
       "expected_throughput": 6400.000143051151,
-      "loss": 2.0,
-      "packets_received": 98,
+      "loss": 0.0,
+      "packets_received": 100,
       "packets_expected": 100
     },
     {
       "gap_ms": 9,
-      "rf_throughput": 651.8442107731343,
+      "rf_throughput": 654.1865847562977,
       "expected_throughput": 3200.0000715255755,
       "loss": 0.0,
       "packets_received": 100,
@@ -52,7 +52,7 @@
     },
     {
       "gap_ms": 19,
-      "rf_throughput": 653.911114328808,
+      "rf_throughput": 652.0793531138944,
       "expected_throughput": 1600.0000357627878,
       "loss": 0.0,
       "packets_received": 100,
@@ -60,42 +60,8 @@
     },
     {
       "gap_ms": 29,
-      "rf_throughput": 653.8327195570854,
+      "rf_throughput": 650.5656992807787,
       "expected_throughput": 1066.666690508525,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    }
-  ],
-  "48": [
-    {
-      "gap_ms": 4,
-      "rf_throughput": 730.4242391611905,
-      "expected_throughput": 9600.000214576727,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 9,
-      "rf_throughput": 728.6962042222602,
-      "expected_throughput": 4800.000107288363,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 19,
-      "rf_throughput": 730.3669237184805,
-      "expected_throughput": 2400.0000536441817,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 29,
-      "rf_throughput": 730.4233646555165,
-      "expected_throughput": 1600.0000357627878,
       "loss": 0.0,
       "packets_received": 100,
       "packets_expected": 100
@@ -104,7 +70,7 @@
   "64": [
     {
       "gap_ms": 4,
-      "rf_throughput": 774.2648959532927,
+      "rf_throughput": 774.3512210704869,
       "expected_throughput": 12800.000286102302,
       "loss": 0.0,
       "packets_received": 100,
@@ -112,7 +78,7 @@
     },
     {
       "gap_ms": 9,
-      "rf_throughput": 775.6856181163744,
+      "rf_throughput": 775.9214917415454,
       "expected_throughput": 6400.000143051151,
       "loss": 0.0,
       "packets_received": 100,
@@ -120,7 +86,7 @@
     },
     {
       "gap_ms": 19,
-      "rf_throughput": 775.7395066335752,
+      "rf_throughput": 775.8614334961849,
       "expected_throughput": 3200.0000715255755,
       "loss": 0.0,
       "packets_received": 100,
@@ -128,42 +94,8 @@
     },
     {
       "gap_ms": 29,
-      "rf_throughput": 775.6229966923066,
+      "rf_throughput": 768.1659182945406,
       "expected_throughput": 2133.33338101705,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    }
-  ],
-  "96": [
-    {
-      "gap_ms": 4,
-      "rf_throughput": 825.6361657650588,
-      "expected_throughput": 19200.000429153453,
-      "loss": 1.0,
-      "packets_received": 99,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 9,
-      "rf_throughput": 827.2592133840997,
-      "expected_throughput": 9600.000214576727,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 19,
-      "rf_throughput": 825.9839680579663,
-      "expected_throughput": 4800.000107288363,
-      "loss": 0.0,
-      "packets_received": 100,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 29,
-      "rf_throughput": 821.1157152770373,
-      "expected_throughput": 3200.0000715255755,
       "loss": 1.0,
       "packets_received": 99,
       "packets_expected": 100
@@ -172,7 +104,7 @@
   "128": [
     {
       "gap_ms": 4,
-      "rf_throughput": 855.4083265678219,
+      "rf_throughput": 856.4391875609642,
       "expected_throughput": 25600.000572204604,
       "loss": 0.0,
       "packets_received": 100,
@@ -180,15 +112,15 @@
     },
     {
       "gap_ms": 9,
-      "rf_throughput": 854.5108184957293,
+      "rf_throughput": 850.532723930896,
       "expected_throughput": 12800.000286102302,
-      "loss": 0.0,
-      "packets_received": 100,
+      "loss": 1.0,
+      "packets_received": 99,
       "packets_expected": 100
     },
     {
       "gap_ms": 19,
-      "rf_throughput": 854.5339133209588,
+      "rf_throughput": 856.4299929451166,
       "expected_throughput": 6400.000143051151,
       "loss": 0.0,
       "packets_received": 100,
@@ -196,119 +128,17 @@
     },
     {
       "gap_ms": 29,
-      "rf_throughput": 855.4209066987324,
+      "rf_throughput": 856.4476719210055,
       "expected_throughput": 4266.6667620341,
       "loss": 0.0,
       "packets_received": 100,
       "packets_expected": 100
     }
   ],
-  "160": [
-    {
-      "gap_ms": 4,
-      "rf_throughput": 866.9880601411286,
-      "expected_throughput": 32000.000715255752,
-      "loss": 1.0,
-      "packets_received": 99,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 9,
-      "rf_throughput": 867.6132965066779,
-      "expected_throughput": 16000.000357627876,
-      "loss": 1.0,
-      "packets_received": 99,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 19,
-      "rf_throughput": 866.9479430175339,
-      "expected_throughput": 8000.000178813938,
-      "loss": 1.0,
-      "packets_received": 99,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 29,
-      "rf_throughput": 866.9098431070296,
-      "expected_throughput": 5333.333452542625,
-      "loss": 1.0,
-      "packets_received": 99,
-      "packets_expected": 100
-    }
-  ],
-  "192": [
-    {
-      "gap_ms": 4,
-      "rf_throughput": 878.4079431204985,
-      "expected_throughput": 38400.00085830691,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 9,
-      "rf_throughput": 877.7370502572152,
-      "expected_throughput": 19200.000429153453,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 19,
-      "rf_throughput": 878.3441919769559,
-      "expected_throughput": 9600.000214576727,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 29,
-      "rf_throughput": 878.3982444506329,
-      "expected_throughput": 6400.000143051151,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    }
-  ],
-  "224": [
-    {
-      "gap_ms": 4,
-      "rf_throughput": 887.0950752769087,
-      "expected_throughput": 44800.001001358054,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 9,
-      "rf_throughput": 887.1516419703471,
-      "expected_throughput": 22400.000500679027,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 19,
-      "rf_throughput": 887.1165113073117,
-      "expected_throughput": 11200.000250339514,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    },
-    {
-      "gap_ms": 29,
-      "rf_throughput": 880.8825744979694,
-      "expected_throughput": 7466.666833559676,
-      "loss": 2.0,
-      "packets_received": 98,
-      "packets_expected": 100
-    }
-  ],
   "256": [
     {
       "gap_ms": 4,
-      "rf_throughput": 887.2132202981091,
+      "rf_throughput": 887.1962473903487,
       "expected_throughput": 51200.00114440921,
       "loss": 2.0,
       "packets_received": 98,
@@ -316,7 +146,7 @@
     },
     {
       "gap_ms": 9,
-      "rf_throughput": 887.1592668028836,
+      "rf_throughput": 894.7616473552345,
       "expected_throughput": 25600.000572204604,
       "loss": 2.0,
       "packets_received": 98,
@@ -324,7 +154,7 @@
     },
     {
       "gap_ms": 19,
-      "rf_throughput": 887.2128761956892,
+      "rf_throughput": 894.2912213091086,
       "expected_throughput": 12800.000286102302,
       "loss": 2.0,
       "packets_received": 98,
@@ -332,10 +162,72 @@
     },
     {
       "gap_ms": 29,
-      "rf_throughput": 887.1151245152307,
+      "rf_throughput": 894.7978644247293,
       "expected_throughput": 8533.3335240682,
       "loss": 2.0,
       "packets_received": 98,
+      "packets_expected": 100
+    }
+  ],
+  "512": [
+    {
+      "gap_ms": 4,
+      "rf_throughput": 894.0702839570368,
+      "expected_throughput": 102400.00228881842,
+      "loss": 4.0,
+      "packets_received": 96,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 9,
+      "rf_throughput": 894.070140492726,
+      "expected_throughput": 51200.00114440921,
+      "loss": 4.0,
+      "packets_received": 96,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 19,
+      "rf_throughput": 903.3790419713903,
+      "expected_throughput": 25600.000572204604,
+      "loss": 3.0,
+      "packets_received": 97,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 29,
+      "rf_throughput": 894.0474349377351,
+      "expected_throughput": 17066.6670481364,
+      "loss": 4.0,
+      "packets_received": 96,
+      "packets_expected": 100
+    }
+  ],
+  "1024": [
+    {
+      "gap_ms": 4,
+      "rf_throughput": 883.5376138060483,
+      "expected_throughput": 204800.00457763684,
+      "loss": 82.0,
+      "packets_received": 18,
+      "packets_expected": 100
+    }
+  ],
+  "48059": [
+    {
+      "gap_ms": -5,
+      "rf_throughput": 942.1175367834531,
+      "expected_throughput": 0,
+      "loss": 99.0,
+      "packets_received": 1,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": -5,
+      "rf_throughput": 872.7328892658248,
+      "expected_throughput": 0,
+      "loss": 99.0,
+      "packets_received": 1,
       "packets_expected": 100
     }
   ]

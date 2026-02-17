@@ -8,7 +8,7 @@ BAUDRATE = 9600
 PACKETS_PER_TEST = 100
 
 # Expanded sweep variables - 5ms to 200ms air gaps
-MTU_SIZES = [16, 32, 48, 64, 96, 128, 160, 192, 224, 256]
+MTU_SIZES = [16, 32, 64, 128, 256, 512, 1024, 1492, 1500]
 AIR_GAPS = [0.005,0.01, 0.02, 0.03] # Seconds
 
 def send_test_batch(ser, mtu, gap):
@@ -27,7 +27,8 @@ def send_test_batch(ser, mtu, gap):
         # Pack sequence number and pad with 0xBB
         packet = struct.pack('<B I', 0xAA, seq) + (b'\xBB' * payload_size)
         ser.write(packet)
-        
+        ser.flush()  # Wait until all bytes are actually transmitted over serial
+
         # Real-time console update on transmitter
         print(f"\rSending packet {seq+1}/{PACKETS_PER_TEST}...", end='', flush=True)
         time.sleep(gap)
