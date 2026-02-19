@@ -10,10 +10,10 @@ PORT = "COM4"
 BAUDRATE = 9600
 OUTPUT_FILE = "rf433_results_fresh.json"
 
-MTU_SIZES = [16, 32, 64, 128, 160, 192, 256, 384, 512, 768, 1024, 1280, 1492, 1500]
+MTU_SIZES = [16, 32, 64, 128, 160, 192, 256, 384, 512, 768, 1024, 1280, 1500]
 GAP_MS_LIST = [0, 1, 2, 3, 5, 7, 10]
-PACKETS_PER_TEST = 10
-REPEATS = 1
+PACKETS_PER_TEST = 100
+REPEATS = 3
 WINDOW_SIZE = 12
 MAX_ROUNDS = 80
 ACK_TIMEOUT = 5.0
@@ -22,16 +22,51 @@ DEBUG = True
 LINE = "-" * 78
 
 
+class C:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    CYAN = "\033[36m"
+    BLUE = "\033[34m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    MAGENTA = "\033[35m"
+
+
+def paint(text: str, *styles: str) -> str:
+    return "".join(styles) + text + C.RESET
+
+
+def progress_bar(done: int, total: int, width: int = 26) -> str:
+    if total <= 0:
+        return "[" + ("-" * width) + "]"
+    ratio = min(max(done / total, 0.0), 1.0)
+    fill = int(width * ratio)
+    return "[" + ("█" * fill) + ("░" * (width - fill)) + "]"
+
+
+def print_card(title: str, subtitle: str | None = None) -> None:
+    print(paint("┌" + "─" * 76 + "┐", C.CYAN))
+    print(paint(f"│ {title:<74} │", C.CYAN, C.BOLD))
+    if subtitle:
+        print(paint(f"│ {subtitle:<74} │", C.CYAN))
+    print(paint("└" + "─" * 76 + "┘", C.CYAN))
+
+
 def print_section(title: str) -> None:
-    print(f"\n{LINE}")
-    print(title)
-    print(LINE)
+    print()
+    print(paint(LINE, C.BLUE))
+    print(paint(title, C.BOLD, C.BLUE))
+    print(paint(LINE, C.BLUE))
 
 
 def fmt_run_result(entry: dict) -> str:
-    status = "OK" if not entry["aborted"] else "ABORT"
+    status_ok = not entry["aborted"]
+    status = paint("OK", C.BOLD, C.GREEN) if status_ok else paint("ABORT", C.BOLD, C.RED)
+    icon = "✅" if status_ok else "❌"
     return (
-        f"[{status:<5}] recv={entry['packets_received']:>3}/{entry['packets_expected']:<3}  "
+        f"{icon} [{status:<13}] recv={entry['packets_received']:>3}/{entry['packets_expected']:<3}  "
         f"loss={entry['loss']:>5.1f}%  thr={entry['rf_throughput']:>7.1f} B/s  "
         f"crc={entry['crc_failure_percent']:>5.1f}%  to={entry['timeouts']:>3}"
     )
@@ -93,7 +128,13 @@ def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
 
     run_id = random.randint(1, 65535)
     if DEBUG:
-        print(f"\n  • run={run_id}  SYNC  mtu={mtu}  gap={gap_ms}ms  repeat={repeat_idx}")
+        print(
+            paint(
+                f"\n  ▶ run={run_id}  SYNC  mtu={mtu}  gap={gap_ms}ms  repeat={repeat_idx}",
+                C.BOLD,
+                C.MAGENTA,
+            )
+        )
 
     send_msg(
         ser,
@@ -109,7 +150,7 @@ def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
     ack = recv_msg(ser, timeout_s=ACK_TIMEOUT)
     if not ack or ack.get("type") != "SYNC_ACK" or int(ack.get("run_id", -1)) != run_id:
         if DEBUG:
-            print(f"    ! SYNC failed (timeout/invalid): {ack}")
+            print(paint(f"    ⚠ SYNC failed (timeout/invalid): {ack}", C.YELLOW, C.BOLD))
         return {
             "gap_ms": gap_ms,
             "repeat": repeat_idx,
@@ -134,10 +175,10 @@ def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
         if DEBUG:
             done = PACKETS_PER_TEST - len(pending)
             progress = (done / max(PACKETS_PER_TEST, 1)) * 100
+            bar = progress_bar(done, PACKETS_PER_TEST)
             print(
-                f"    · r{rounds + 1:02d}/{MAX_ROUNDS:02d}  "
-                f"pending={len(pending):>3}  burst={seqs[0]:>3}..{seqs[-1]:<3}  "
-                f"progress={progress:>5.1f}%"
+                f"    · r{rounds + 1:02d}/{MAX_ROUNDS:02d}  {bar} {progress:>5.1f}%  "
+                f"pending={len(pending):>3}  burst={seqs[0]:>3}..{seqs[-1]:<3}"
             )
         send_msg(ser, {"type": "BURST", "run_id": run_id, "seqs": seqs})
 
@@ -151,11 +192,11 @@ def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
         rounds += 1
         if not report or report.get("type") != "REPORT":
             if DEBUG:
-                print(f"    ! REPORT timeout/invalid: {report}")
+                print(paint(f"    ⚠ REPORT timeout/invalid: {report}", C.YELLOW))
             continue
         if int(report.get("run_id", -1)) != run_id:
             if DEBUG:
-                print(f"    ! REPORT for other run: {report.get('run_id')}")
+                print(paint(f"    ⚠ REPORT for other run: {report.get('run_id')}", C.YELLOW))
             continue
 
         missing = set(int(x) for x in report.get("missing", []))
@@ -163,8 +204,11 @@ def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
         timeouts = int(report.get("timeouts", timeouts))
         if DEBUG:
             print(
-                f"      report  missing={len(missing):>2}  recv_total={int(report.get('received_total', 0)):>3}  "
-                f"crc_fail={crc_fail:>3}  timeouts={timeouts:>3}"
+                paint(
+                    f"      report  missing={len(missing):>2}  recv_total={int(report.get('received_total', 0)):>3}  "
+                    f"crc_fail={crc_fail:>3}  timeouts={timeouts:>3}",
+                    C.DIM,
+                )
             )
 
         for seq in seqs:
@@ -183,7 +227,7 @@ def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
         timeouts = int(final.get("timeouts", timeouts))
     else:
         if DEBUG:
-            print(f"    ! FINAL timeout/invalid: {final}")
+            print(paint(f"    ⚠ FINAL timeout/invalid: {final}", C.YELLOW))
         packets_received = PACKETS_PER_TEST - len(pending)
         loss = ((PACKETS_PER_TEST - packets_received) / PACKETS_PER_TEST) * 100
 
@@ -211,12 +255,13 @@ def main() -> None:
 
     time.sleep(2)
     ser = Serial(PORT, baudrate=BAUDRATE, timeout=0.2)
-    print_section("RF433 Fresh Benchmark TX")
-    print(f"Port: {PORT}  Baud: {BAUDRATE}  Output: {OUTPUT_FILE}")
-    print(
-        f"MTU: {MTU_SIZES}  Gap(ms): {GAP_MS_LIST}  "
-        f"Packets/test: {PACKETS_PER_TEST}  Repeats: {REPEATS}"
+    print_card(
+        "RF433 Fresh Benchmark TX",
+        f"Port={PORT}  Baud={BAUDRATE}  Packets/test={PACKETS_PER_TEST}  Repeats={REPEATS}",
     )
+    print(paint(f"Output file: {OUTPUT_FILE}", C.CYAN))
+    print(paint(f"MTU set: {MTU_SIZES}", C.CYAN))
+    print(paint(f"Gap set (ms): {GAP_MS_LIST}", C.CYAN))
 
     try:
         for mtu in MTU_SIZES:
@@ -226,7 +271,14 @@ def main() -> None:
 
             for gap_ms in GAP_MS_LIST:
                 for repeat in range(1, REPEATS + 1):
-                    print(f"gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}", flush=True)
+                    print(
+                        paint(
+                            f"gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
+                            C.BOLD,
+                            C.CYAN,
+                        ),
+                        flush=True,
+                    )
                     entry = run_one_test(ser, mtu, gap_ms, repeat)
                     results[mtu_key].append(entry)
                     save_results(results)
@@ -236,8 +288,7 @@ def main() -> None:
     finally:
         ser.close()
 
-    print_section("Benchmark Complete")
-    print(f"Results saved to {OUTPUT_FILE}")
+    print_card("Benchmark Complete", f"Results saved to {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":

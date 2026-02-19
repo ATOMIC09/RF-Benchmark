@@ -11,6 +11,30 @@ MAGIC = 0xA55A
 DEBUG = True
 
 
+class C:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    CYAN = "\033[36m"
+    BLUE = "\033[34m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    MAGENTA = "\033[35m"
+
+
+def paint(text: str, *styles: str) -> str:
+    return "".join(styles) + text + C.RESET
+
+
+def print_card(title: str, subtitle: str | None = None) -> None:
+    print(paint("┌" + "─" * 76 + "┐", C.CYAN))
+    print(paint(f"│ {title:<74} │", C.CYAN, C.BOLD))
+    if subtitle:
+        print(paint(f"│ {subtitle:<74} │", C.CYAN))
+    print(paint("└" + "─" * 76 + "┘", C.CYAN))
+
+
 def send_msg(ser: Serial, obj: dict) -> None:
     ser.write((json.dumps(obj) + "\n").encode("utf-8"))
     ser.flush()
@@ -82,7 +106,7 @@ def decode_frame(frame: bytes, mtu: int) -> dict:
 
 def main() -> None:
     ser = Serial(PORT, baudrate=BAUDRATE, timeout=READ_TIMEOUT)
-    print(f"Fresh RX listening on {PORT} @ {BAUDRATE}")
+    print_card("RF433 Fresh Benchmark RX", f"Listening on {PORT} @ {BAUDRATE}")
 
     state = None
 
@@ -107,7 +131,7 @@ def main() -> None:
                     "timeouts": 0,
                 }
                 send_msg(ser, {"type": "SYNC_ACK", "run_id": run_id})
-                print(f"SYNC run={run_id} mtu={mtu} total={total}")
+                print(paint(f"\n▶ SYNC  run={run_id}  mtu={mtu}  total={total}", C.BOLD, C.MAGENTA))
                 continue
 
             if state is None:
@@ -121,8 +145,11 @@ def main() -> None:
 
                 if DEBUG and seqs:
                     print(
-                        f"  BURST run={run_id} size={len(seqs)} seq={seqs[0]}..{seqs[-1]} "
-                        f"recv_total={len(state['received'])}"
+                        paint(
+                            f"  · BURST run={run_id} size={len(seqs)} seq={seqs[0]}..{seqs[-1]} "
+                            f"recv_total={len(state['received'])}",
+                            C.BLUE,
+                        )
                     )
 
                 missing = set(seqs)
@@ -132,8 +159,11 @@ def main() -> None:
                         state["timeouts"] += 1
                         if DEBUG:
                             print(
-                                f"    timeout while reading frame {idx}/{len(seqs)} "
-                                f"(timeouts={state['timeouts']})"
+                                paint(
+                                    f"    ⚠ timeout while reading frame {idx}/{len(seqs)} "
+                                    f"(timeouts={state['timeouts']})",
+                                    C.YELLOW,
+                                )
                             )
                         break
 
@@ -141,7 +171,12 @@ def main() -> None:
                     if not decoded.get("ok"):
                         state["crc_fail"] += 1
                         if DEBUG:
-                            print(f"    crc/frame error (crc_fail={state['crc_fail']})")
+                            print(
+                                paint(
+                                    f"    ✖ crc/frame error (crc_fail={state['crc_fail']})",
+                                    C.RED,
+                                )
+                            )
                         continue
 
                     if decoded["run_id"] != state["run_id"]:
@@ -166,9 +201,12 @@ def main() -> None:
                 if DEBUG:
                     preview = sorted(missing)[:6]
                     print(
-                        f"  REPORT run={run_id} missing={len(missing)} preview={preview} "
-                        f"recv_total={len(state['received'])} crc_fail={state['crc_fail']} "
-                        f"timeouts={state['timeouts']}"
+                        paint(
+                            f"  report run={run_id} missing={len(missing)} preview={preview} "
+                            f"recv_total={len(state['received'])} crc_fail={state['crc_fail']} "
+                            f"timeouts={state['timeouts']}",
+                            C.DIM,
+                        )
                     )
                 continue
 
@@ -192,8 +230,12 @@ def main() -> None:
                     },
                 )
                 print(
-                    f"DONE run={state['run_id']} recv={received}/{total} "
-                    f"loss={loss:.1f}% crc_fail={state['crc_fail']}"
+                    paint(
+                        f"✅ DONE run={state['run_id']} recv={received}/{total} "
+                        f"loss={loss:.1f}% crc_fail={state['crc_fail']}",
+                        C.BOLD,
+                        C.GREEN,
+                    )
                 )
                 state = None
     finally:
