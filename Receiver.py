@@ -1,160 +1,123 @@
-import serial
-import time
-import struct
-import sys
 import json
-import os
-import random
+import time
 import zlib
+import os
+from typing import Literal
+from serial import Serial
 
-# --- Configuration ---
-PORT = 'COM5'  # Change to your RX port
-BAUDRATE = 9600
-PACKETS_PER_TEST = 100
-OUTPUT_FILE = 'rf433_results.json'
+# ── Protocol helpers ──────────────────────────────────────────────────────────
 
-def save_results(data_by_mtu):
-    """Saves test results to JSON file."""
-    with open(OUTPUT_FILE, 'w') as f:
-        json.dump(data_by_mtu, f, indent=2)
-    print(f"   [Saved to {OUTPUT_FILE}]")
+num_packet_before_check = 1
 
-def main():
-    try:
-        # Initialize data storage
-        data_by_mtu = {}  # Dictionary: {mtu_size: [list of test results]}
+def encodeTx(byteInput: bytes, packetNo: int, totalPacket: int,
+             packetType: Literal["image", "text", "json"]) -> bytes:
+    typeLookup = {"image": 0, "text": 1, "json": 2}
+    if isinstance(byteInput, str):
+        byteInput = byteInput.encode()
+        packetType = "text"
+    if isinstance(byteInput, dict):
+        byteInput = json.dumps(byteInput).encode()
+        packetType = "json"
+    packet_num   = packetNo.to_bytes(3, byteorder='big')
+    packet_total = totalPacket.to_bytes(3, byteorder='big')
+    packet_type  = typeLookup[packetType].to_bytes(1, byteorder='big')
+    packet_len   = len(byteInput).to_bytes(2, byteorder='big')
+    output = packet_num + packet_type + packet_total + packet_len + byteInput
+    output += zlib.crc32(output).to_bytes(4, "big")
+    return output
 
-        with serial.Serial(PORT, BAUDRATE, timeout=5.0) as ser:  # 5s timeout for 3s cooldown
-            print(f"Listening on {PORT} at {BAUDRATE} bps... (Waiting for SYNC)\n")
+def decodeTx(byteInput: bytes) -> dict:
+    packetTypeLookup = {0: "image", 1: "text", 2: "json"}
+    packet_num         = int.from_bytes(byteInput[0:3], byteorder='big')
+    packet_type        = int.from_bytes(byteInput[3:4], byteorder='big')
+    total_packet_count = int.from_bytes(byteInput[4:7], byteorder='big')
+    packet_size        = int.from_bytes(byteInput[7:9], byteorder='big')
+    packet_content     = byteInput[9:-4]
+    checkFCS           = zlib.crc32(byteInput[:-4]).to_bytes(4, "big")
+    fcs                = byteInput[-4:]
+    return {
+        "packet_num":         packet_num,
+        "packet_type":        packetTypeLookup.get(packet_type, "unknown"),
+        "total_packet_count": total_packet_count,
+        "packet_size":        packet_size,
+        "packet_content":     packet_content,
+        "pass":               fcs == checkFCS,
+    }
 
-            # Clear buffer once at startup
-            ser.reset_input_buffer()
+def decodeMetaData(byteInput: bytes) -> dict:
+    packetTypeLookup = {0: "image", 1: "text", 2: "json"}
+    packet_num         = int.from_bytes(byteInput[0:3], byteorder='big')
+    packet_type        = int.from_bytes(byteInput[3:4], byteorder='big')
+    total_packet_count = int.from_bytes(byteInput[4:7], byteorder='big')
+    packet_size        = int.from_bytes(byteInput[7:9], byteorder='big')
+    return {
+        "packet_num":         packet_num,
+        "packet_type":        packetTypeLookup.get(packet_type, "err"),
+        "total_packet_count": total_packet_count,
+        "packet_size":        packet_size,
+    }
 
-            while True:
-                # Wait for SYNC - use read_until for reliable detection
-                try:
-                    ser.read_until(b'SYNC', size=1000)  # Add size limit
-                except:
-                    print("   [WARNING] SYNC timeout - waiting for next transmission...")
-                    time.sleep(0.5)
-                    continue
+# ── Configuration ─────────────────────────────────────────────────────────────
 
-                sync_data = ser.read(6)  # MTU (2) + SEED (4)
-                if len(sync_data) < 6:
-                    continue
+PORT        = "COM5"
+BAUDRATE    = 9600
+FRAME_SIZE  = 1500
+OUTPUT_FILE = "output.jpg"
 
-                current_mtu, random_seed = struct.unpack('<H I', sync_data)
+# ── Main ──────────────────────────────────────────────────────────────────────
 
-                packets_received = 0
-                crc_failures = 0
-                bytes_received = 0
-                start_time = time.time()
-                last_packet_time = time.time()
+try:
+    os.remove(OUTPUT_FILE)
+except FileNotFoundError:
+    pass
 
-                # 2. Process incoming packets with shorter timeout
-                ser.timeout = 0.1  # Short timeout for packet reading
-                packet_buffer = b''
-                max_buffer_size = current_mtu * 150  # Limit buffer to 150 packets worth
+# Pre-create the output file so seek-writes work
+open(OUTPUT_FILE, 'w').close()
 
-                while True:
-                    # Check for batch timeout
-                    if time.time() - last_packet_time > 1.5 and packets_received > 0:
-                        break # Batch ended via timeout
+ser = Serial(PORT, baudrate=BAUDRATE, timeout=5)
 
-                    # Read available data
-                    if ser.in_waiting > 0:
-                        chunk = ser.read(ser.in_waiting)
-                        packet_buffer += chunk
+last_frame_receive = 0
+done = False
 
-                        # Prevent infinite buffer growth
-                        if len(packet_buffer) > max_buffer_size:
-                            # Keep only the last max_buffer_size bytes
-                            packet_buffer = packet_buffer[-max_buffer_size:]
+print(f"Listening on {PORT} at {BAUDRATE} baud...")
 
-                    # Process complete packets from buffer
-                    while len(packet_buffer) >= current_mtu:
-                        # Look for start byte
-                        if packet_buffer[0] == 0xAA:
-                            # Extract packet
-                            packet = packet_buffer[:current_mtu]
-                            packet_buffer = packet_buffer[current_mtu:]
+while True:
+    read = ser.read(FRAME_SIZE + 13)  # 13 = 9 header + 4 CRC
+    if read:
+        done = False
+        metaData = decodeMetaData(read[0:9])
+        try:
+            decoded = decodeTx(read)
+            if not decoded["pass"]:
+                print(f"CRC error on packet {metaData['packet_num']} - requesting retransmit")
+                reply = encodeTx(f"ASK{last_frame_receive}", 0, 1, 'text')
+                ser.write(reply)
+            else:
+                last_frame_receive = decoded["packet_num"]
+                pct = (decoded["packet_num"] / max(decoded["total_packet_count"] - 1, 1)) * 100
+                print(f"\033[32mReceived {pct:.2f}%  "
+                      f"packet {last_frame_receive}/{decoded['total_packet_count'] - 1}\033[39m")
 
-                            # Parse packet: start byte (1) + seq (4) + payload + crc32 (4)
-                            seq_num = struct.unpack('<I', packet[1:5])[0]
-                            payload = packet[5:-4]
-                            received_crc32 = struct.unpack('<I', packet[-4:])[0]
+                if decoded["packet_type"] == 'image':
+                    with open(OUTPUT_FILE, 'rb+') as f:
+                        offset = decoded["packet_num"] * FRAME_SIZE
+                        f.seek(offset, 0)
+                        f.write(decoded["packet_content"])
+                        print(f"\033[33m  Wrote {len(decoded['packet_content'])} bytes at offset {offset}\033[39m")
 
-                            # Regenerate expected payload
-                            rng = random.Random(random_seed + seq_num)
-                            expected_payload = bytes([rng.randint(0, 255) for _ in range(len(payload))])
+                reply = encodeTx(f"ACK{last_frame_receive}", 0, 1, 'text')
+                ser.write(reply)
 
-                            # Verify CRC32
-                            expected_crc32 = zlib.crc32(expected_payload) & 0xFFFFFFFF
+                if (decoded["packet_num"] + 1) == decoded["total_packet_count"]:
+                    done = True
+                    print("\nTransfer complete!")
 
-                            if received_crc32 != expected_crc32:
-                                crc_failures += 1
+        except Exception as e:
+            print(f"Decode error: {e}")
 
-                            packets_received += 1
-                            bytes_received += current_mtu
-                            last_packet_time = time.time()
-
-                            sys.stdout.write(f"\r-> Receiving [{current_mtu}B]: {packets_received}/{PACKETS_PER_TEST} [CRC Fail: {crc_failures}]")
-                            sys.stdout.flush()
-
-                            if packets_received == PACKETS_PER_TEST:
-                                break
-                        else:
-                            # Misaligned - skip one byte and try again
-                            packet_buffer = packet_buffer[1:]
-
-                    if packets_received == PACKETS_PER_TEST:
-                        break
-
-                    time.sleep(0.001)  # Small delay to prevent busy-waiting
-
-                # Restore timeout for SYNC detection
-                ser.timeout = 5.0
-
-                # 3. Batch complete: Calculate metrics
-                elapsed = last_packet_time - start_time
-                rf_throughput = bytes_received / elapsed if elapsed > 0 else 0
-                loss_percent = ((PACKETS_PER_TEST - packets_received) / PACKETS_PER_TEST) * 100
-                crc_failure_percent = (crc_failures / packets_received * 100) if packets_received > 0 else 0
-
-                # Send ACK to transmitter
-                ser.write(b'ACK')
-                ser.flush()
-
-                # Clear any remaining packet data before next test
-                ser.reset_input_buffer()
-
-                print(f"\n   [RESULT] Loss: {loss_percent:.1f}% | CRC Fail: {crc_failure_percent:.1f}% | RF Speed: {rf_throughput:.2f} B/s")
-
-                # 4. Save results to dictionary and file
-                mtu_key = str(current_mtu)  # JSON keys must be strings
-                if mtu_key not in data_by_mtu:
-                    data_by_mtu[mtu_key] = []
-
-                data_by_mtu[mtu_key].append({
-                    'rf_throughput': rf_throughput,
-                    'loss': loss_percent,
-                    'crc_failures': crc_failures,
-                    'crc_failure_percent': crc_failure_percent,
-                    'packets_received': packets_received,
-                    'packets_expected': PACKETS_PER_TEST
-                })
-
-                # Save to JSON file after each test
-                save_results(data_by_mtu)
-                print()
-
-    except KeyboardInterrupt:
-        print("\nTest stopped by user.")
-        if data_by_mtu:
-            save_results(data_by_mtu)
-            print(f"\nFinal results saved to {OUTPUT_FILE}")
-    except Exception as e:
-        print(f"\nError: {e}")
-
-if __name__ == '__main__':
-    main()
+    else:
+        if not done:
+            ask_packet = max(last_frame_receive - 1, 0)
+            print(f"Timeout - requesting packet {ask_packet}")
+            reply = encodeTx(f"ASK{ask_packet}", 0, 1, 'text')
+            ser.write(reply)

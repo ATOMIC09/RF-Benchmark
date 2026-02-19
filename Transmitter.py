@@ -1,74 +1,136 @@
-import serial
+import json
+import math
 import time
-import struct
-import random
 import zlib
+from typing import Literal
+from serial import Serial
 
-# --- Configuration ---
-PORT = 'COM4'  # Change to your TX port
-BAUDRATE = 9600
-PACKETS_PER_TEST = 100
+# ── Protocol helpers ──────────────────────────────────────────────────────────
 
-# Fine-grained buffer limit sweep: 8-byte steps from 16 to 256
-# Goal: find maximum MTU the RF module buffer can hold before overflow
-MTU_SIZES = [16, 32, 64, 128, 256, 512, 1024, 1492, 1500]
+num_packet_before_check = 1
 
-def send_test_batch(ser, mtu):
-    print(f"\n--- Testing MTU: {mtu} bytes ---")
+def encodeTx(byteInput: bytes, packetNo: int, totalPacket: int,
+             packetType: Literal["image", "text", "json"]) -> bytes:
+    typeLookup = {"image": 0, "text": 1, "json": 2}
+    if isinstance(byteInput, str):
+        byteInput = byteInput.encode()
+        packetType = "text"
+    if isinstance(byteInput, dict):
+        byteInput = json.dumps(byteInput).encode()
+        packetType = "json"
+    packet_num   = packetNo.to_bytes(3, byteorder='big')
+    packet_total = totalPacket.to_bytes(3, byteorder='big')
+    packet_type  = typeLookup[packetType].to_bytes(1, byteorder='big')
+    packet_len   = len(byteInput).to_bytes(2, byteorder='big')
+    output = packet_num + packet_type + packet_total + packet_len + byteInput
+    output += zlib.crc32(output).to_bytes(4, "big")
+    return output
 
-    # Generate random seed for this batch
-    random_seed = random.randint(0, 2**32 - 1)
+def decodeTx(byteInput: bytes) -> dict:
+    packetTypeLookup = {0: "image", 1: "text", 2: "json"}
+    packet_num         = int.from_bytes(byteInput[0:3], byteorder='big')
+    packet_type        = int.from_bytes(byteInput[3:4], byteorder='big')
+    total_packet_count = int.from_bytes(byteInput[4:7], byteorder='big')
+    packet_size        = int.from_bytes(byteInput[7:9], byteorder='big')
+    packet_content     = byteInput[9:-4]
+    checkFCS           = zlib.crc32(byteInput[:-4]).to_bytes(4, "big")
+    fcs                = byteInput[-4:]
+    return {
+        "packet_num":         packet_num,
+        "packet_type":        packetTypeLookup.get(packet_type, "unknown"),
+        "total_packet_count": total_packet_count,
+        "packet_size":        packet_size,
+        "packet_content":     packet_content,
+        "pass":               fcs == checkFCS,
+    }
 
-    # Send SYNC header
-    # Format: 'SYNC' + MTU (unsigned short) + SEED (unsigned int)
-    sync_packet = b'SYNC' + struct.pack('<H I', mtu, random_seed)
-    ser.write(sync_packet)
-    ser.flush()
-    time.sleep(1.5) # Give receiver time to parse SYNC and get ready
+def decodeMetaData(byteInput: bytes) -> dict:
+    packetTypeLookup = {0: "image", 1: "text", 2: "json"}
+    packet_num         = int.from_bytes(byteInput[0:3], byteorder='big')
+    packet_type        = int.from_bytes(byteInput[3:4], byteorder='big')
+    total_packet_count = int.from_bytes(byteInput[4:7], byteorder='big')
+    packet_size        = int.from_bytes(byteInput[7:9], byteorder='big')
+    return {
+        "packet_num":         packet_num,
+        "packet_type":        packetTypeLookup.get(packet_type, "err"),
+        "total_packet_count": total_packet_count,
+        "packet_size":        packet_size,
+    }
 
-    for seq in range(PACKETS_PER_TEST):
-        # Packet: Start Byte (1) + Seq Num (4) + Random Payload + CRC32 (4)
-        # So payload_size = mtu - 1 - 4 - 4 = mtu - 9
-        payload_size = mtu - 9
+# ── Configuration ─────────────────────────────────────────────────────────────
 
-        # Generate deterministic random payload based on seed and sequence
-        rng = random.Random(random_seed + seq)
-        random_payload = bytes([rng.randint(0, 255) for _ in range(payload_size)])
+PORT       = "COM4"
+BAUDRATE   = 9600
+FRAME_SIZE = 1500
+IMAGE_FILE = "image.jpg"
 
-        # Calculate CRC32 of the payload
-        crc32 = zlib.crc32(random_payload) & 0xFFFFFFFF
+# ── Main ──────────────────────────────────────────────────────────────────────
 
-        # Pack packet: start byte + seq + payload + crc32
-        packet = struct.pack('<B I', 0xAA, seq) + random_payload + struct.pack('<I', crc32)
-        ser.write(packet)
-        ser.flush()  # Block until bytes are physically out of UART - no sleep needed
+time.sleep(2)
+ser = Serial(PORT, baudrate=BAUDRATE, timeout=5)
 
-        print(f"\rSending packet {seq+1}/{PACKETS_PER_TEST}...", end='', flush=True)
+with open(IMAGE_FILE, 'rb') as f:
+    content = f.read()
 
-    print(" Done.")
+total_size = len(content)
+noOfSend   = math.ceil(total_size / FRAME_SIZE)
+print(f"File size: {total_size} bytes  |  Packets: {noOfSend}")
 
-    # Wait for ACK from receiver
-    print("Waiting for ACK from receiver...", end='', flush=True)
-    ser.timeout = 5.0
-    ack = ser.read(3)
-    if ack == b'ACK':
-        print(" Received ACK!")
-    else:
-        print(f" No ACK received (got: {ack})")
+i         = 0
+lastTime  = 0
+startTime = time.time()
 
-def main():
-    try:
-        with serial.Serial(PORT, BAUDRATE, timeout=1) as ser:
-            time.sleep(2)
-            print("Starting buffer limit sweep...\n")
+while i < noOfSend:
+    timeDiff = time.time() - lastTime
+    lastTime = time.time()
 
-            for mtu in MTU_SIZES:
-                send_test_batch(ser, mtu)
-                time.sleep(3) # Cool down RF module between tests
+    index_start = FRAME_SIZE * i
+    index_end   = index_start + FRAME_SIZE
+    transmit = encodeTx(content[index_start:index_end], i, noOfSend, 'image')
+    ser.write(transmit)
+    print(f"Sent packet {i}/{noOfSend - 1}  "
+          f"({index_end / total_size * 100:.1f}%)  "
+          f"timeDiff={timeDiff:.4f}s  bytes={len(transmit)}")
 
-            print("\nSweep complete.")
-    except Exception as e:
-        print(f"Error: {e}")
+    if i % num_packet_before_check == 0 or i == noOfSend - 1:
+        print("Waiting for ACK/ASK...")
+        total_read: bytes = b''
+        metaData = None
+        ser.flush()
 
-if __name__ == '__main__':
-    main()
+        while True:
+            read = ser.read(1)
+            if read:
+                total_read += read
+                if len(total_read) == 9:
+                    metaData = decodeMetaData(total_read)
+                if metaData and len(total_read) >= 9 + metaData["packet_size"] + 4:
+                    decoded = decodeTx(total_read)
+                    print(f"  Reply: {decoded['packet_content']}")
+                    if decoded["pass"]:
+                        content_str = decoded["packet_content"].decode(errors='replace')
+                        if "ASK" in content_str:
+                            ack_package = content_str.split("ASK")[1]
+                            print(f"  ASK received - reverting to packet {int(ack_package)}")
+                            i = int(ack_package) - 1
+                        elif "ACK" in content_str:
+                            ack_package = content_str.split("ACK")[1]
+                            if int(ack_package) == i:
+                                print("  ACK OK")
+                            else:
+                                print(f"  ACK mismatch - reverting to packet {int(ack_package)}")
+                                i = int(ack_package) - 1
+                    else:
+                        total_read = b''
+                        metaData = None
+                        continue
+                    break
+            else:
+                print("  No reply - retrying last packet")
+                i = max(-1, i - 1)
+                break
+
+    i += 1
+
+print(f"\nDone. Total time: {time.time() - startTime:.2f}s")
+ser.close()
