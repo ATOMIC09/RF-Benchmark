@@ -31,7 +31,7 @@ sequenceDiagram
     participant RF as AS32 RF433 Link
     participant RX as benchmark_rx_fresh.py
 
-    TX->>RX: SYNC {run_id, mtu, count, window}\n(JSON line over UART)
+    TX->>RX: SYNC {run_id, mtu, count, window}<br/>JSON line over UART
     RX-->>TX: SYNC_ACK {run_id}
 
     loop Until all seq received or max rounds
@@ -44,6 +44,17 @@ sequenceDiagram
     TX->>RX: END {run_id}
     RX-->>TX: FINAL {received, expected, loss, crc_fail, timeouts}
 ```
+
+  ### Protocol Type
+
+  This is **not** stop-and-wait ARQ.
+
+  It is closer to a **windowed selective-repeat ARQ (block-based)**:
+  - TX sends a burst (`seqs[]`) within a window.
+  - RX reports only missing sequence numbers for that burst.
+  - TX retransmits only missing frames in later rounds.
+
+  So practically: **windowed burst + selective retransmission via missing-list reports**.
 
 ### Data Frame Format (binary)
 
@@ -66,6 +77,60 @@ Each frame has fixed size = `MTU` bytes:
 - Larger frames contain more bits, so one bit error is more likely to corrupt the whole frame.
 - One corruption triggers CRC fail → RX reports missing sequence(s) → TX resends.
 - Even with more retries, large MTU can still win throughput because payload efficiency is much higher (`payload = MTU - 14`).
+
+---
+
+## Fresh Benchmark Design
+
+This project uses a **two-plane protocol** for RF433 benchmarking:
+
+1. **Control plane (JSON line messages over UART)**
+   - `SYNC` → start test session with `run_id`, `mtu`, `count`, `window`
+   - `BURST` → announce which sequence numbers are sent in this round
+   - `REPORT` → receiver returns missing sequence numbers, crc/timeouts counters
+   - `END` / `FINAL` → close and summarize run
+
+2. **Data plane (fixed-size binary RF frames)**
+   - Fixed frame size equals selected `MTU`
+   - Header contains `MAGIC`, `run_id`, `seq`, `total`, `payload_len`
+   - CRC32 protects header + payload
+
+### Reliability model
+
+- Sender transmits a **windowed burst** of sequence numbers.
+- Receiver validates each frame and accumulates missing frames.
+- Receiver sends a single `REPORT` per burst (missing list + error counters).
+- Sender retransmits only missing frames in later rounds.
+
+This is a **block-based selective-repeat ARQ** (sliding-window-like), optimized for low-rate noisy links.
+
+---
+
+## Difference from `how` Code
+
+The `how` folder demonstrates a simpler ACK/ASK file-transfer loop. The fresh benchmark design is intentionally different:
+
+- **Protocol style**
+  - `how`: mostly packet-by-packet ACK/ASK rollback (`ACKn`, `ASKn`)
+  - fresh benchmark: burst + missing-list report (block selective repeat)
+
+- **Control messaging**
+  - `how`: control is embedded in text payload inside packet frames
+  - fresh benchmark: explicit JSON control messages (`SYNC`, `BURST`, `REPORT`, `END`, `FINAL`)
+
+- **Session safety**
+  - `how`: no strong run/session isolation
+  - fresh benchmark: each run has `run_id` to prevent cross-run contamination
+
+- **Benchmark quality**
+  - `how`: focused on file transfer behavior and ACK loop
+  - fresh benchmark: focused on repeatable MTU/gap optimization with machine-readable metrics
+
+- **Observability**
+  - `how`: basic transfer progress logs
+  - fresh benchmark: structured telemetry (missing, crc_fail, timeouts, aborted)
+
+Both approaches are valid, but this repository’s **optimization workflow** should use the fresh benchmark scripts.
 
 ---
 
