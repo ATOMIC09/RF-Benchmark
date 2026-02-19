@@ -1,0 +1,118 @@
+
+======================================================================
+RF433 AIR GAP PERFORMANCE ANALYSIS
+======================================================================
+Test Date: 2026-02-17 16:10:01
+Baudrate: 9600 bps
+Packets per test: 100
+
+======================================================================
+OPTIMAL CONFIGURATION (Best Efficiency Score)
+======================================================================
+MTU Size:          128 bytes
+Air Gap:           3 ms
+RF Throughput:     854.52 B/s
+Packet Loss:       0.0%
+CRC Failures:      0.0%
+Reliability:       100.0%
+Efficiency Score:  0.855
+
+======================================================================
+ALTERNATIVE CONFIGURATIONS
+======================================================================
+
+Best Raw Throughput:
+  MTU: 128B @ 3ms
+  Throughput: 854.52 B/s
+  Loss: 0.0%, CRC Fail: 0.0%
+
+Best Reliability (100% delivery, 0% corruption):
+  MTU: 8B @ 1ms
+  Throughput: 320.79 B/s
+  Loss: 0.0%, CRC Fail: 0.0%
+
+======================================================================
+PERFORMANCE BY AIR GAP
+======================================================================
+
+Air Gap 1 ms:
+  Avg Throughput: 617.69 B/s
+  Avg Loss: 0.2%
+  Avg CRC Failures: 0.2%
+  Avg Reliability: 99.6%
+  Status: VERY GOOD - Minimal loss and corruption
+
+Air Gap 2 ms:
+  Avg Throughput: 616.83 B/s
+  Avg Loss: 0.2%
+  Avg CRC Failures: 0.4%
+  Avg Reliability: 99.4%
+  Status: VERY GOOD - Minimal loss and corruption
+
+Air Gap 3 ms:
+  Avg Throughput: 618.24 B/s
+  Avg Loss: 0.0%
+  Avg CRC Failures: 0.0%
+  Avg Reliability: 100.0%
+  Status: EXCELLENT - Perfect delivery
+
+Air Gap 4 ms:
+  Avg Throughput: 617.45 B/s
+  Avg Loss: 0.3%
+  Avg CRC Failures: 0.1%
+  Avg Reliability: 99.6%
+  Status: VERY GOOD - Minimal loss and corruption
+
+Air Gap 9 ms:
+  Avg Throughput: 615.30 B/s
+  Avg Loss: 0.0%
+  Avg CRC Failures: 0.0%
+  Avg Reliability: 100.0%
+  Status: EXCELLENT - Perfect delivery
+
+Air Gap 19 ms:
+  Avg Throughput: 589.69 B/s
+  Avg Loss: 0.2%
+  Avg CRC Failures: 0.0%
+  Avg Reliability: 99.8%
+  Status: VERY GOOD - Minimal loss and corruption
+
+Air Gap 29 ms:
+  Avg Throughput: 558.53 B/s
+  Avg Loss: 0.4%
+  Avg CRC Failures: 0.2%
+  Avg Reliability: 99.4%
+  Status: VERY GOOD - Minimal loss and corruption
+
+======================================================================
+KEY FINDINGS
+======================================================================
+1. Air Gap Range Tested: 1-29 ms
+2. Optimal Air Gap: 3 ms
+3. Impact of Air Gap on Performance:
+   - Too short: May cause buffer overflow at larger MTU sizes
+   - Too long: Reduces throughput unnecessarily
+   - Sweet spot: Balance between throughput and reliability
+
+4. Air Gap vs MTU Interaction:
+   - Smaller MTU sizes are more tolerant of short air gaps
+   - Larger MTU sizes require longer air gaps to avoid overflow
+   - RF transmission time increases with MTU size
+
+======================================================================
+RECOMMENDATIONS
+======================================================================
+For Maximum Throughput:
+  - Use shortest air gap that maintains reliability
+  - Optimal: 3 ms @ 128B MTU
+
+For Maximum Reliability:
+  - Use air gap >= 1 ms with MTU <= 64 bytes
+  - Expected: 0% loss, 0% corruption
+
+Dynamic Air Gap Calculation:
+  - Minimum air gap = (MTU x 10 bits / 9600) + overhead
+  - Add safety margin for RF module processing time
+  - Consider environmental interference
+
+======================================================================

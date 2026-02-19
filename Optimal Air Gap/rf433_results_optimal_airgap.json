@@ -1,0 +1,412 @@
+{
+  "8": [
+    {
+      "gap_ms": 1,
+      "rf_throughput": 320.7944172508959,
+      "expected_throughput": 7999.999620020408,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 2,
+      "rf_throughput": 320.60683095684055,
+      "expected_throughput": 3999.999810010204,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 3,
+      "rf_throughput": 320.6158374387602,
+      "expected_throughput": 2666.6666434870826,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 320.7840206987828,
+      "expected_throughput": 1999.999905005102,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 320.79978446631605,
+      "expected_throughput": 1600.0000357627878,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 9,
+      "rf_throughput": 305.0547394108394,
+      "expected_throughput": 800.0000178813939,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 19,
+      "rf_throughput": 226.43110864517877,
+      "expected_throughput": 400.00000894069694,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 29,
+      "rf_throughput": 174.38110808688344,
+      "expected_throughput": 266.6666726271313,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    }
+  ],
+  "16": [
+    {
+      "gap_ms": 1,
+      "rf_throughput": 495.3834222605058,
+      "expected_throughput": 15999.999240040815,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 2,
+      "rf_throughput": 492.88386597297955,
+      "expected_throughput": 7999.999620020408,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 3,
+      "rf_throughput": 493.12406178270857,
+      "expected_throughput": 5333.333286974165,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 495.44025569313754,
+      "expected_throughput": 3999.999810010204,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 495.4692260116961,
+      "expected_throughput": 3200.0000715255755,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 9,
+      "rf_throughput": 492.9056955772882,
+      "expected_throughput": 1600.0000357627878,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 19,
+      "rf_throughput": 446.7284095586986,
+      "expected_throughput": 800.0000178813939,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 29,
+      "rf_throughput": 349.8773245000022,
+      "expected_throughput": 533.3333452542626,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    }
+  ],
+  "32": [
+    {
+      "gap_ms": 1,
+      "rf_throughput": 652.013559507786,
+      "expected_throughput": 31999.99848008163,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 2,
+      "rf_throughput": 651.8675432463301,
+      "expected_throughput": 15999.999240040815,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 3,
+      "rf_throughput": 649.9534850701627,
+      "expected_throughput": 10666.66657394833,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 649.9604094674617,
+      "expected_throughput": 7999.999620020408,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 652.1041281484526,
+      "expected_throughput": 6400.000143051151,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 9,
+      "rf_throughput": 652.1537789287597,
+      "expected_throughput": 3200.0000715255755,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 19,
+      "rf_throughput": 650.0311726752142,
+      "expected_throughput": 1600.0000357627878,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 29,
+      "rf_throughput": 649.89255673522,
+      "expected_throughput": 1066.666690508525,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    }
+  ],
+  "64": [
+    {
+      "gap_ms": 1,
+      "rf_throughput": 766.580354566824,
+      "expected_throughput": 63999.99696016326,
+      "loss": 1.0,
+      "crc_failures": 1,
+      "crc_failure_percent": 1.0101010101010102,
+      "packets_received": 99,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 2,
+      "rf_throughput": 772.8589366335924,
+      "expected_throughput": 31999.99848008163,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 3,
+      "rf_throughput": 772.9684298500558,
+      "expected_throughput": 21333.33314789666,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 772.8857729544252,
+      "expected_throughput": 15999.999240040815,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 769.601588509014,
+      "expected_throughput": 12800.000286102302,
+      "loss": 1.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 99,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 9,
+      "rf_throughput": 772.7717870765232,
+      "expected_throughput": 6400.000143051151,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 19,
+      "rf_throughput": 772.8888216427505,
+      "expected_throughput": 3200.0000715255755,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 29,
+      "rf_throughput": 765.1835290918549,
+      "expected_throughput": 2133.33338101705,
+      "loss": 1.0,
+      "crc_failures": 1,
+      "crc_failure_percent": 1.0101010101010102,
+      "packets_received": 99,
+      "packets_expected": 100
+    }
+  ],
+  "128": [
+    {
+      "gap_ms": 1,
+      "rf_throughput": 853.6779548755952,
+      "expected_throughput": 127999.99392032652,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 2,
+      "rf_throughput": 845.9300300510026,
+      "expected_throughput": 63999.99696016326,
+      "loss": 1.0,
+      "crc_failures": 2,
+      "crc_failure_percent": 2.0202020202020203,
+      "packets_received": 99,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 3,
+      "rf_throughput": 854.5171565272477,
+      "expected_throughput": 42666.66629579332,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 845.1346576647187,
+      "expected_throughput": 31999.99848008163,
+      "loss": 1.0,
+      "crc_failures": 1,
+      "crc_failure_percent": 1.0101010101010102,
+      "packets_received": 99,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 4,
+      "rf_throughput": 852.336678744941,
+      "expected_throughput": 25600.000572204604,
+      "loss": 1.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 99,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 9,
+      "rf_throughput": 853.6165083272505,
+      "expected_throughput": 12800.000286102302,
+      "loss": 0.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 100,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 19,
+      "rf_throughput": 852.3934473395356,
+      "expected_throughput": 6400.000143051151,
+      "loss": 1.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 99,
+      "packets_expected": 100
+    },
+    {
+      "gap_ms": 29,
+      "rf_throughput": 853.3212141565837,
+      "expected_throughput": 4266.6667620341,
+      "loss": 1.0,
+      "crc_failures": 0,
+      "crc_failure_percent": 0.0,
+      "packets_received": 99,
+      "packets_expected": 100
+    }
+  ]
+}
