@@ -1,136 +1,156 @@
-import json
 import math
 import time
+import json
 import zlib
 from typing import Literal
 from serial import Serial
 
-# ── Protocol helpers ──────────────────────────────────────────────────────────
 
 num_packet_before_check = 1
 
-def encodeTx(byteInput: bytes, packetNo: int, totalPacket: int,
+
+def encodeTx(byteInput, packetNo: int, totalPacket: int,
              packetType: Literal["image", "text", "json"]) -> bytes:
-    typeLookup = {"image": 0, "text": 1, "json": 2}
+    typeLookup = {
+        "image": 0,
+        "text": 1,
+        "json": 2,
+    }
     if isinstance(byteInput, str):
         byteInput = byteInput.encode()
         packetType = "text"
     if isinstance(byteInput, dict):
         byteInput = json.dumps(byteInput).encode()
         packetType = "json"
-    packet_num   = packetNo.to_bytes(3, byteorder='big')
-    packet_total = totalPacket.to_bytes(3, byteorder='big')
-    packet_type  = typeLookup[packetType].to_bytes(1, byteorder='big')
-    packet_len   = len(byteInput).to_bytes(2, byteorder='big')
-    output = packet_num + packet_type + packet_total + packet_len + byteInput
+
+    packet_num = packetNo.to_bytes(3, byteorder="big")
+    packet_total = totalPacket.to_bytes(3, byteorder="big")
+    packet_type = typeLookup[packetType].to_bytes(1, byteorder="big")
+    packet_length = len(byteInput).to_bytes(2, byteorder="big")
+
+    output = packet_num + packet_type + packet_total + packet_length + byteInput
     output += zlib.crc32(output).to_bytes(4, "big")
     return output
 
+
 def decodeTx(byteInput: bytes) -> dict:
-    packetTypeLookup = {0: "image", 1: "text", 2: "json"}
-    packet_num         = int.from_bytes(byteInput[0:3], byteorder='big')
-    packet_type        = int.from_bytes(byteInput[3:4], byteorder='big')
-    total_packet_count = int.from_bytes(byteInput[4:7], byteorder='big')
-    packet_size        = int.from_bytes(byteInput[7:9], byteorder='big')
-    packet_content     = byteInput[9:-4]
-    checkFCS           = zlib.crc32(byteInput[:-4]).to_bytes(4, "big")
-    fcs                = byteInput[-4:]
-    return {
-        "packet_num":         packet_num,
-        "packet_type":        packetTypeLookup.get(packet_type, "unknown"),
-        "total_packet_count": total_packet_count,
-        "packet_size":        packet_size,
-        "packet_content":     packet_content,
-        "pass":               fcs == checkFCS,
+    packetTypeLookup = {
+        0: "image",
+        1: "text",
+        2: "json",
     }
+    packet_num = int.from_bytes(byteInput[0:3], byteorder="big")
+    packet_type = int.from_bytes(byteInput[3:4], byteorder="big")
+    total_packet_count = int.from_bytes(byteInput[4:7], byteorder="big")
+    packet_size = int.from_bytes(byteInput[7:9], byteorder="big")
+    packet_content = byteInput[9:-4]
+    checkFCS = zlib.crc32(byteInput[:-4]).to_bytes(4, "big")
+    fcs = byteInput[-4:]
+
+    return {
+        "packet_num": packet_num,
+        "packet_type": packetTypeLookup.get(packet_type, "err"),
+        "total_packet_count": total_packet_count,
+        "packet_size": packet_size,
+        "packet_content": packet_content,
+        "pass": fcs == checkFCS,
+    }
+
 
 def decodeMetaData(byteInput: bytes) -> dict:
-    packetTypeLookup = {0: "image", 1: "text", 2: "json"}
-    packet_num         = int.from_bytes(byteInput[0:3], byteorder='big')
-    packet_type        = int.from_bytes(byteInput[3:4], byteorder='big')
-    total_packet_count = int.from_bytes(byteInput[4:7], byteorder='big')
-    packet_size        = int.from_bytes(byteInput[7:9], byteorder='big')
-    return {
-        "packet_num":         packet_num,
-        "packet_type":        packetTypeLookup.get(packet_type, "err"),
-        "total_packet_count": total_packet_count,
-        "packet_size":        packet_size,
-    }
+    packet_size = int.from_bytes(byteInput[7:9], byteorder="big")
+    return {"packet_size": packet_size}
 
-# ── Configuration ─────────────────────────────────────────────────────────────
 
-PORT       = "COM4"
-BAUDRATE   = 9600
-FRAME_SIZE = 1500
-IMAGE_FILE = "image.jpg"
+def main() -> None:
+    time.sleep(2)
+    ser = Serial("COM4", baudrate=9600, timeout=5)
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+    with open("image.jpg", "rb") as imageFile:
+        time.sleep(1)
+        content = imageFile.read()
+        total_size = len(content)
+        print(total_size)
 
-time.sleep(2)
-ser = Serial(PORT, baudrate=BAUDRATE, timeout=5)
+        frame_size = 1500
+        noOfSend = math.ceil(total_size / frame_size)
+        i = 0
+        lastTime = 0.0
+        startTime = time.time()
 
-with open(IMAGE_FILE, 'rb') as f:
-    content = f.read()
+        while i < noOfSend:
+            timeDiff = time.time() - lastTime
+            lastTime = time.time()
 
-total_size = len(content)
-noOfSend   = math.ceil(total_size / FRAME_SIZE)
-print(f"File size: {total_size} bytes  |  Packets: {noOfSend}")
+            index_start = frame_size * i
+            index_end = (frame_size * i) + frame_size
+            transmit = encodeTx(content[index_start:index_end], i, noOfSend, "image")
+            ser.write(transmit)
+            ser.flush()
 
-i         = 0
-lastTime  = 0
-startTime = time.time()
+            print(
+                f"Send Packet {i} from {noOfSend - 1} = {index_end / total_size * 100:.3f}% "
+                f"time diff : {timeDiff:.4f}s total of {len(transmit)} bytes"
+            )
 
-while i < noOfSend:
-    timeDiff = time.time() - lastTime
-    lastTime = time.time()
+            if (i >= 0 and i % num_packet_before_check == 0) or i == noOfSend - 1:
+                print("waiting for checking reply")
+                total_read: bytes = b""
+                metaData: dict | None = None
+                ser.flush()
 
-    index_start = FRAME_SIZE * i
-    index_end   = index_start + FRAME_SIZE
-    transmit = encodeTx(content[index_start:index_end], i, noOfSend, 'image')
-    ser.write(transmit)
-    print(f"Sent packet {i}/{noOfSend - 1}  "
-          f"({index_end / total_size * 100:.1f}%)  "
-          f"timeDiff={timeDiff:.4f}s  bytes={len(transmit)}")
+                while True:
+                    read = ser.read()
+                    if read:
+                        total_read += read
 
-    if i % num_packet_before_check == 0 or i == noOfSend - 1:
-        print("Waiting for ACK/ASK...")
-        total_read: bytes = b''
-        metaData = None
-        ser.flush()
+                        if len(total_read) == 9:
+                            metaData = decodeMetaData(total_read)
+                        if (
+                            len(total_read) > 9
+                            and metaData is not None
+                            and len(total_read) >= metaData["packet_size"] + 13
+                        ):
+                            decoded = decodeTx(total_read)
+                            print(f"return message {decoded['packet_content']}")
+                            ask_state = "ACK"
 
-        while True:
-            read = ser.read(1)
-            if read:
-                total_read += read
-                if len(total_read) == 9:
-                    metaData = decodeMetaData(total_read)
-                if metaData and len(total_read) >= 9 + metaData["packet_size"] + 4:
-                    decoded = decodeTx(total_read)
-                    print(f"  Reply: {decoded['packet_content']}")
-                    if decoded["pass"]:
-                        content_str = decoded["packet_content"].decode(errors='replace')
-                        if "ASK" in content_str:
-                            ack_package = content_str.split("ASK")[1]
-                            print(f"  ASK received - reverting to packet {int(ack_package)}")
-                            i = int(ack_package) - 1
-                        elif "ACK" in content_str:
-                            ack_package = content_str.split("ACK")[1]
-                            if int(ack_package) == i:
-                                print("  ACK OK")
+                            if decoded["pass"]:
+                                text = decoded["packet_content"].decode(errors="ignore")
+                                if "ASK" in text:
+                                    ack_package = text.split("ASK")[1]
+                                    ask_state = "ASK"
+                                elif "ACK" in text:
+                                    ack_package = text.split("ACK")[1]
+                                    ask_state = "ACK"
+                                else:
+                                    ack_package = ""
+
+                                if ask_state == "ACK" and ack_package.isdigit():
+                                    if int(ack_package) == i:
+                                        print("Check OK ✅")
+                                        break
+                                    else:
+                                        print("Reverting...")
+                                        i = int(ack_package) - 1
+                                        break
+                                elif ask_state == "ASK" and ack_package.isdigit():
+                                    print("Ask Reverting...")
+                                    i = int(ack_package) - 1
+                                    break
                             else:
-                                print(f"  ACK mismatch - reverting to packet {int(ack_package)}")
-                                i = int(ack_package) - 1
+                                total_read = b""
                     else:
-                        total_read = b''
-                        metaData = None
-                        continue
-                    break
-            else:
-                print("  No reply - retrying last packet")
-                i = max(-1, i - 1)
-                break
+                        print("No ACK received, retrying...")
+                        i = max(-1, i - 1)
+                        break
 
-    i += 1
+            i += 1
 
-print(f"\nDone. Total time: {time.time() - startTime:.2f}s")
-ser.close()
+        print(f"Total Time {time.time() - startTime:.2f}s")
+
+    ser.close()
+
+
+if __name__ == "__main__":
+    main()
