@@ -39,12 +39,11 @@ def main():
                     time.sleep(0.5)
                     continue
 
-                sync_data = ser.read(10)  # MTU (2) + GAP (4) + SEED (4)
-                if len(sync_data) < 10:
+                sync_data = ser.read(6)  # MTU (2) + SEED (4)
+                if len(sync_data) < 6:
                     continue
 
-                current_mtu, current_gap, random_seed = struct.unpack('<H f I', sync_data)
-                gap_ms = int(current_gap * 1000)
+                current_mtu, random_seed = struct.unpack('<H I', sync_data)
 
                 packets_received = 0
                 crc_failures = 0
@@ -99,7 +98,7 @@ def main():
                             bytes_received += current_mtu
                             last_packet_time = time.time()
 
-                            sys.stdout.write(f"\r-> Receiving [{current_mtu}B@{gap_ms}ms]: {packets_received}/{PACKETS_PER_TEST} [CRC Fail: {crc_failures}]")
+                            sys.stdout.write(f"\r-> Receiving [{current_mtu}B]: {packets_received}/{PACKETS_PER_TEST} [CRC Fail: {crc_failures}]")
                             sys.stdout.flush()
 
                             if packets_received == PACKETS_PER_TEST:
@@ -122,10 +121,6 @@ def main():
                 loss_percent = ((PACKETS_PER_TEST - packets_received) / PACKETS_PER_TEST) * 100
                 crc_failure_percent = (crc_failures / packets_received * 100) if packets_received > 0 else 0
 
-                # Calculate expected throughput based on air gap
-                expected_time = packets_received * current_gap
-                expected_throughput = bytes_received / expected_time if expected_time > 0 else 0
-
                 # Send ACK to transmitter
                 ser.write(b'ACK')
                 ser.flush()
@@ -133,7 +128,7 @@ def main():
                 # Clear any remaining packet data before next test
                 ser.reset_input_buffer()
 
-                print(f"\n   [RESULT] Loss: {loss_percent:.1f}% | CRC Fail: {crc_failure_percent:.1f}% | RF Speed: {rf_throughput:.2f} B/s | Expected: {expected_throughput:.2f} B/s")
+                print(f"\n   [RESULT] Loss: {loss_percent:.1f}% | CRC Fail: {crc_failure_percent:.1f}% | RF Speed: {rf_throughput:.2f} B/s")
 
                 # 4. Save results to dictionary and file
                 mtu_key = str(current_mtu)  # JSON keys must be strings
@@ -141,9 +136,7 @@ def main():
                     data_by_mtu[mtu_key] = []
 
                 data_by_mtu[mtu_key].append({
-                    'gap_ms': gap_ms,
                     'rf_throughput': rf_throughput,
-                    'expected_throughput': expected_throughput,
                     'loss': loss_percent,
                     'crc_failures': crc_failures,
                     'crc_failure_percent': crc_failure_percent,
