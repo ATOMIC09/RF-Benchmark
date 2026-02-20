@@ -228,3 +228,34 @@ pip install pyserial
 
 - Legacy scripts (`Transmitter.py`, `Receiver.py`, `Plotter.py`, `Overview.py`) are older workflow.
 - For optimization on AS32, use the **fresh benchmark scripts** documented here.
+
+---
+
+## Python Library Usage (`rf433lib`)
+
+You can now import a reusable RF433 over-the-air communication library in other projects.
+
+### Modules
+
+- `rf433lib.protocol` → low-level frame + control helpers
+- `rf433lib.receiver.RF433Receiver` → receiver class (receive one payload/session)
+- `rf433lib.transmitter.RF433Transmitter` → transmitter class (send payload reliably)
+
+### Quick example
+
+```python
+from rf433lib import RF433Receiver, RF433Transmitter
+from rf433lib.receiver import ReceiverConfig
+from rf433lib.transmitter import TransmitterConfig
+
+# Receiver side (one message/session)
+receiver = RF433Receiver(ReceiverConfig(port="COM5", baudrate=9600))
+result = receiver.receive_once()
+
+# Transmitter side
+tx = RF433Transmitter(TransmitterConfig(port="COM4", baudrate=9600))
+result = tx.send_bytes(b"hello", mtu=256, gap_ms=3, metadata={"topic": "demo"})
+print(result)
+```
+
+See `rf433lib_example.py` for a runnable example.
