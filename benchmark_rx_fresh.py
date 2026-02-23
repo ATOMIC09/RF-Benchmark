@@ -1,7 +1,9 @@
+import hashlib
 import json
 import struct
 import time
 import zlib
+from pathlib import Path
 from serial import Serial
 
 PORT = "COM5"
@@ -9,6 +11,9 @@ BAUDRATE = 9600
 READ_TIMEOUT = 0.2
 MAGIC = 0xA55A
 DEBUG = True
+SAVE_RECEIVED_FILE = True
+SAVE_PARTIAL_FILE = False
+RECEIVED_DIR = "rx_received_files"
 
 
 class C:
@@ -87,7 +92,7 @@ def decode_frame(frame: bytes, mtu: int) -> dict:
         return {"ok": False}
 
     payload = frame[10:-4]
-    if payload_len != len(payload):
+    if payload_len > len(payload):
         return {"ok": False}
 
     expected_crc = zlib.crc32(frame[:-4]) & 0xFFFFFFFF
@@ -101,7 +106,12 @@ def decode_frame(frame: bytes, mtu: int) -> dict:
         "seq": seq,
         "total": total,
         "payload_len": payload_len,
+        "payload": payload[:payload_len],
     }
+
+
+def sha1_hex(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()
 
 
 def main() -> None:
@@ -122,16 +132,27 @@ def main() -> None:
                 run_id = int(msg["run_id"])
                 mtu = int(msg["mtu"])
                 total = int(msg["count"])
+                total_size = int(msg.get("total_size", 0))
+                meta = msg.get("meta", {}) or {}
                 state = {
                     "run_id": run_id,
                     "mtu": mtu,
                     "total": total,
+                    "total_size": total_size,
+                    "meta": meta,
                     "received": set(),
+                    "chunks": [None] * total,
                     "crc_fail": 0,
                     "timeouts": 0,
                 }
                 send_msg(ser, {"type": "SYNC_ACK", "run_id": run_id})
-                print(paint(f"\n▶ SYNC  run={run_id}  mtu={mtu}  total={total}", C.BOLD, C.MAGENTA))
+                print(
+                    paint(
+                        f"\n▶ SYNC  run={run_id}  mtu={mtu}  total={total}  size={total_size}",
+                        C.BOLD,
+                        C.MAGENTA,
+                    )
+                )
                 continue
 
             if state is None:
@@ -186,6 +207,8 @@ def main() -> None:
                     if seq in missing:
                         missing.discard(seq)
                         state["received"].add(seq)
+                    if 0 <= seq < state["total"]:
+                        state["chunks"][seq] = decoded["payload"]
 
                 send_msg(
                     ser,
@@ -217,6 +240,37 @@ def main() -> None:
                 received = len(state["received"])
                 total = state["total"]
                 loss = ((total - received) / total) * 100 if total else 100.0
+
+                reconstructed = b""
+                if received == total:
+                    reconstructed = b"".join(chunk or b"" for chunk in state["chunks"])
+                    if state["total_size"] > 0:
+                        reconstructed = reconstructed[: state["total_size"]]
+
+                expected_sha1 = str(state["meta"].get("payload_sha1", ""))
+                actual_sha1 = sha1_hex(reconstructed) if reconstructed else ""
+                hash_ok = bool(reconstructed) and bool(expected_sha1) and expected_sha1 == actual_sha1
+
+                should_save = False
+                if SAVE_RECEIVED_FILE:
+                    if received == total:
+                        should_save = True
+                    elif SAVE_PARTIAL_FILE:
+                        reconstructed = b"".join(chunk or b"" for chunk in state["chunks"])
+                        if state["total_size"] > 0:
+                            reconstructed = reconstructed[: state["total_size"]]
+                        should_save = True
+
+                saved_path = None
+                if should_save:
+                    out_dir = Path(RECEIVED_DIR)
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    status = "ok" if received == total else "partial"
+                    filename = f"run_{state['run_id']}_{status}.bin"
+                    out_path = out_dir / filename
+                    out_path.write_bytes(reconstructed)
+                    saved_path = str(out_path)
+
                 send_msg(
                     ser,
                     {
@@ -229,10 +283,25 @@ def main() -> None:
                         "timeouts": state["timeouts"],
                     },
                 )
+                if saved_path:
+                    print(
+                        paint(
+                            f"💾 saved: {saved_path}",
+                            C.CYAN,
+                        )
+                    )
+
+                hash_note = ""
+                if expected_sha1:
+                    if received == total:
+                        hash_note = f" sha1={'OK' if hash_ok else 'MISMATCH'}"
+                    else:
+                        hash_note = " sha1=SKIP(incomplete)"
+
                 print(
                     paint(
                         f"✅ DONE run={state['run_id']} recv={received}/{total} "
-                        f"loss={loss:.1f}% crc_fail={state['crc_fail']}",
+                        f"loss={loss:.1f}% crc_fail={state['crc_fail']}{hash_note}",
                         C.BOLD,
                         C.GREEN,
                     )

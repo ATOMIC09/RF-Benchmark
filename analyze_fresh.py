@@ -21,6 +21,8 @@ def main() -> None:
             avg_thr = mean(x["rf_throughput"] for x in items)
             avg_loss = mean(x["loss"] for x in items)
             avg_crc = mean(x.get("crc_failure_percent", 0.0) for x in items)
+            avg_chunks = mean(x.get("chunks_expected", x.get("packets_expected", 0)) for x in items)
+            avg_file_size = mean(x.get("file_size_bytes", x.get("bytes_sent", 0)) for x in items)
             goodput = avg_thr * (1.0 - avg_loss / 100.0)
             rows.append(
                 {
@@ -29,6 +31,8 @@ def main() -> None:
                     "avg_throughput": avg_thr,
                     "avg_loss": avg_loss,
                     "avg_crc": avg_crc,
+                    "avg_chunks": avg_chunks,
+                    "avg_file_size": avg_file_size,
                     "goodput": goodput,
                 }
             )
@@ -44,7 +48,8 @@ def main() -> None:
         print(
             f"MTU={r['mtu']:>3} gap={r['gap_ms']:>3}ms "
             f"goodput={r['goodput']:.1f}B/s thr={r['avg_throughput']:.1f}B/s "
-            f"loss={r['avg_loss']:.2f}% crc={r['avg_crc']:.2f}%"
+            f"loss={r['avg_loss']:.2f}% crc={r['avg_crc']:.2f}% "
+            f"chunks≈{r['avg_chunks']:.0f} size≈{r['avg_file_size']:.0f}B"
         )
 
     print("\n=== RECOMMENDED POINT ===")

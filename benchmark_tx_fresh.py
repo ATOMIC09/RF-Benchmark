@@ -1,23 +1,23 @@
+import hashlib
 import json
-import os
 import random
-import struct
 import time
-import zlib
-from serial import Serial
+from pathlib import Path
+
+from rf433lib.transmitter import RF433Transmitter, TransmitterConfig
 
 PORT = "COM4"
 BAUDRATE = 9600
 OUTPUT_FILE = "rf433_results_fresh.json"
+INPUT_FILE: str | None = None
 
-MTU_SIZES = [16, 32, 64, 128, 160, 256, 512, 1024, 1500]
+MTU_SIZES = [64, 128, 160, 256, 512, 1024, 1500]
 GAP_MS_LIST = [0, 1, 2, 3, 5, 7, 10]
-PACKETS_PER_TEST = 100
 REPEATS = 3
+FILE_SIZE_BYTES = 1 * 1024
 WINDOW_SIZE = 12
-MAX_ROUNDS = 20
+MAX_ROUNDS = 40
 ACK_TIMEOUT = 5.0
-MAGIC = 0xA55A
 DEBUG = True
 LINE = "-" * 78
 
@@ -66,46 +66,41 @@ def fmt_run_result(entry: dict) -> str:
     status = paint("OK", C.BOLD, C.GREEN) if status_ok else paint("ABORT", C.BOLD, C.RED)
     icon = "✅" if status_ok else "❌"
     return (
-        f"{icon} [{status:<13}] recv={entry['packets_received']:>3}/{entry['packets_expected']:<3}  "
-        f"loss={entry['loss']:>5.1f}%  thr={entry['rf_throughput']:>7.1f} B/s  "
-        f"crc={entry['crc_failure_percent']:>5.1f}%  to={entry['timeouts']:>3}"
+        f"{icon} [{status:<13}] recv={entry['chunks_received']:>4}/{entry['chunks_expected']:<4}  "
+        f"bytes={entry['bytes_sent']:>7}  loss={entry['loss']:>5.1f}%  "
+        f"thr={entry['rf_throughput']:>7.1f} B/s  crc={entry['crc_failure_percent']:>5.1f}%  "
+        f"to={entry['timeouts']:>3}"
     )
 
 
-def send_msg(ser: Serial, obj: dict) -> None:
-    ser.write((json.dumps(obj) + "\n").encode("utf-8"))
-    ser.flush()
+def build_test_payload(file_path: Path | None, file_size: int, seed: int = 1337) -> tuple[bytes, str]:
+    if file_path is not None:
+        raw = file_path.read_bytes()
+        if file_size > 0:
+            if file_size > len(raw):
+                raise ValueError(
+                    f"Requested file_size={file_size} exceeds source file size ({len(raw)} bytes)"
+                )
+            raw = raw[:file_size]
+        source = f"file:{file_path.name}"
+        return raw, source
+
+    if file_size <= 0:
+        raise ValueError("file_size must be > 0 when no input file is provided")
+
+    rng = random.Random(seed)
+    payload = rng.randbytes(file_size)
+    return payload, "generated"
 
 
-def read_line(ser: Serial, timeout_s: float) -> str | None:
-    deadline = time.monotonic() + timeout_s
-    buf = bytearray()
-    while time.monotonic() < deadline:
-        b = ser.read(1)
-        if not b:
-            continue
-        if b == b"\n":
-            return buf.decode("utf-8", errors="ignore").strip()
-        buf.extend(b)
-    return None
+def payload_sha1(data: bytes) -> str:
+    return hashlib.sha1(data).hexdigest()
 
 
-def recv_msg(ser: Serial, timeout_s: float) -> dict | None:
-    line = read_line(ser, timeout_s)
-    if not line:
-        return None
-    try:
-        return json.loads(line)
-    except json.JSONDecodeError:
-        return None
-
-
-def build_frame(run_id: int, seq: int, total: int, payload_size: int) -> bytes:
-    payload = os.urandom(payload_size)
-    header = struct.pack(">HHHHH", MAGIC, run_id, seq, total, payload_size)
-    frame_wo_crc = header + payload
-    crc = zlib.crc32(frame_wo_crc) & 0xFFFFFFFF
-    return frame_wo_crc + struct.pack(">I", crc)
+def build_expected_throughput(mtu: int, gap_ms: int, baudrate: int) -> float:
+    payload_size = mtu - 14
+    tx_time_per_frame = (mtu * 10) / max(baudrate, 1)
+    return payload_size / max(tx_time_per_frame + (gap_ms / 1000.0), 1e-6)
 
 
 def load_results() -> dict:
@@ -121,172 +116,140 @@ def save_results(data: dict) -> None:
         json.dump(data, f, indent=2)
 
 
-def run_one_test(ser: Serial, mtu: int, gap_ms: int, repeat_idx: int) -> dict:
-    payload_size = mtu - 14
-    if payload_size <= 0:
-        raise ValueError("MTU too small")
+def run_one_test(
+    tx: RF433Transmitter,
+    payload: bytes,
+    payload_hash: str,
+    payload_source: str,
+    mtu: int,
+    gap_ms: int,
+    repeat_idx: int,
+) -> dict:
+    payload_capacity = mtu - 14
+    if payload_capacity <= 0:
+        raise ValueError(f"MTU={mtu} is too small (must be >= 14)")
 
-    run_id = random.randint(1, 65535)
+    chunks_total = (len(payload) + payload_capacity - 1) // payload_capacity
+    min_rounds = (chunks_total + WINDOW_SIZE - 1) // WINDOW_SIZE
+    effective_max_rounds = max(MAX_ROUNDS, min_rounds + 8)
+    tx.config.max_rounds = effective_max_rounds
+
     if DEBUG:
         print(
             paint(
-                f"\n  ▶ run={run_id}  SYNC  mtu={mtu}  gap={gap_ms}ms  repeat={repeat_idx}",
+                f"\n  ▶ TX file payload  mtu={mtu}  gap={gap_ms}ms  repeat={repeat_idx}  "
+                f"chunks={chunks_total}  max_rounds={effective_max_rounds}",
                 C.BOLD,
                 C.MAGENTA,
             )
         )
 
-    send_msg(
-        ser,
-        {
-            "type": "SYNC",
-            "run_id": run_id,
-            "mtu": mtu,
-            "count": PACKETS_PER_TEST,
-            "window": WINDOW_SIZE,
+    result = tx.send_bytes(
+        payload,
+        mtu=mtu,
+        gap_ms=gap_ms,
+        metadata={
+            "benchmark": "fresh_file",
+            "payload_sha1": payload_hash,
+            "payload_source": payload_source,
+            "payload_size": len(payload),
+            "repeat": repeat_idx,
         },
     )
 
-    ack = recv_msg(ser, timeout_s=ACK_TIMEOUT)
-    if not ack or ack.get("type") != "SYNC_ACK" or int(ack.get("run_id", -1)) != run_id:
-        if DEBUG:
-            print(paint(f"    ⚠ SYNC failed (timeout/invalid): {ack}", C.YELLOW, C.BOLD))
-        return {
-            "gap_ms": gap_ms,
-            "repeat": repeat_idx,
-            "rf_throughput": 0.0,
-            "expected_throughput": payload_size / ((mtu * 10) / BAUDRATE),
-            "loss": 100.0,
-            "packets_received": 0,
-            "packets_expected": PACKETS_PER_TEST,
-            "crc_failure_percent": 100.0,
-            "timeouts": 0,
-            "aborted": True,
-        }
+    chunks_total = int(result.get("chunks_total", 0))
+    chunks_received = int(result.get("chunks_received", 0))
+    crc_fail_count = int(result.get("crc_fail_count", 0))
 
-    pending = set(range(PACKETS_PER_TEST))
-    rounds = 0
-    crc_fail = 0
-    timeouts = 0
-    start = time.time()
-
-    while pending and rounds < MAX_ROUNDS:
-        seqs = sorted(pending)[:WINDOW_SIZE]
-        if DEBUG:
-            done = PACKETS_PER_TEST - len(pending)
-            progress = (done / max(PACKETS_PER_TEST, 1)) * 100
-            bar = progress_bar(done, PACKETS_PER_TEST)
-            print(
-                f"    · r{rounds + 1:02d}/{MAX_ROUNDS:02d}  {bar} {progress:>5.1f}%  "
-                f"pending={len(pending):>3}  burst={seqs[0]:>3}..{seqs[-1]:<3}"
-            )
-        send_msg(ser, {"type": "BURST", "run_id": run_id, "seqs": seqs})
-
-        for seq in seqs:
-            ser.write(build_frame(run_id, seq, PACKETS_PER_TEST, payload_size))
-            ser.flush()
-            if gap_ms > 0:
-                time.sleep(gap_ms / 1000.0)
-
-        report = recv_msg(ser, timeout_s=ACK_TIMEOUT)
-        rounds += 1
-        if not report or report.get("type") != "REPORT":
-            if DEBUG:
-                print(paint(f"    ⚠ REPORT timeout/invalid: {report}", C.YELLOW))
-            continue
-        if int(report.get("run_id", -1)) != run_id:
-            if DEBUG:
-                print(paint(f"    ⚠ REPORT for other run: {report.get('run_id')}", C.YELLOW))
-            continue
-
-        missing = set(int(x) for x in report.get("missing", []))
-        crc_fail = int(report.get("crc_fail", crc_fail))
-        timeouts = int(report.get("timeouts", timeouts))
-        if DEBUG:
-            print(
-                paint(
-                    f"      report  missing={len(missing):>2}  recv_total={int(report.get('received_total', 0)):>3}  "
-                    f"crc_fail={crc_fail:>3}  timeouts={timeouts:>3}",
-                    C.DIM,
-                )
-            )
-
-        for seq in seqs:
-            if seq not in missing and seq in pending:
-                pending.remove(seq)
-
-    elapsed = max(time.time() - start, 1e-6)
-
-    send_msg(ser, {"type": "END", "run_id": run_id})
-    final = recv_msg(ser, timeout_s=ACK_TIMEOUT)
-
-    if final and final.get("type") == "FINAL" and int(final.get("run_id", -1)) == run_id:
-        packets_received = int(final.get("received", PACKETS_PER_TEST - len(pending)))
-        loss = float(final.get("loss", ((PACKETS_PER_TEST - packets_received) / PACKETS_PER_TEST) * 100))
-        crc_fail = int(final.get("crc_fail", crc_fail))
-        timeouts = int(final.get("timeouts", timeouts))
-    else:
-        if DEBUG:
-            print(paint(f"    ⚠ FINAL timeout/invalid: {final}", C.YELLOW))
-        packets_received = PACKETS_PER_TEST - len(pending)
-        loss = ((PACKETS_PER_TEST - packets_received) / PACKETS_PER_TEST) * 100
-
-    rf_throughput = (packets_received * payload_size) / elapsed
-    tx_time_per_pkt = (mtu * 10) / BAUDRATE
-    expected_throughput = payload_size / max(tx_time_per_pkt + (gap_ms / 1000.0), 1e-6)
-    crc_failure_percent = (crc_fail / max(PACKETS_PER_TEST, 1)) * 100
+    crc_failure_percent = (
+        (crc_fail_count / max(chunks_total, 1)) * 100
+        if chunks_total > 0
+        else 100.0
+    )
 
     return {
         "gap_ms": gap_ms,
         "repeat": repeat_idx,
-        "rf_throughput": rf_throughput,
-        "expected_throughput": expected_throughput,
-        "loss": loss,
-        "packets_received": packets_received,
-        "packets_expected": PACKETS_PER_TEST,
+        "file_size_bytes": len(payload),
+        "payload_source": payload_source,
+        "payload_sha1": payload_hash,
+        "rf_throughput": float(result.get("effective_bps", 0.0)),
+        "expected_throughput": build_expected_throughput(mtu, gap_ms, BAUDRATE),
+        "loss": float(result.get("loss_percent", 100.0)),
+        "chunks_received": chunks_received,
+        "chunks_expected": chunks_total,
+        "packets_received": chunks_received,
+        "packets_expected": chunks_total,
+        "bytes_sent": int(result.get("bytes_total", len(payload))),
+        "crc_fail_count": crc_fail_count,
         "crc_failure_percent": crc_failure_percent,
-        "timeouts": timeouts,
-        "aborted": bool(pending),
+        "timeouts": int(result.get("timeouts", 0)),
+        "duration_s": float(result.get("duration_s", 0.0)),
+        "rounds": int(result.get("rounds", 0)),
+        "aborted": bool(result.get("aborted", True)),
     }
 
 
 def main() -> None:
+    input_path = Path(INPUT_FILE) if INPUT_FILE else None
+    if input_path is not None and not input_path.exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+
+    payload, payload_source = build_test_payload(input_path, FILE_SIZE_BYTES)
+    payload_hash = payload_sha1(payload)
+
+    tx = RF433Transmitter(
+        TransmitterConfig(
+            port=PORT,
+            baudrate=BAUDRATE,
+            serial_timeout=0.2,
+            ack_timeout=ACK_TIMEOUT,
+            window_size=WINDOW_SIZE,
+            max_rounds=MAX_ROUNDS,
+        )
+    )
     results = load_results()
 
     time.sleep(2)
-    ser = Serial(PORT, baudrate=BAUDRATE, timeout=0.2)
     print_card(
         "RF433 Fresh Benchmark TX",
-        f"Port={PORT}  Baud={BAUDRATE}  Packets/test={PACKETS_PER_TEST}  Repeats={REPEATS}",
+        f"Port={PORT}  Baud={BAUDRATE}  FileSize={len(payload)}B  Repeats={REPEATS}",
     )
     print(paint(f"Output file: {OUTPUT_FILE}", C.CYAN))
+    print(paint(f"Payload source: {payload_source}", C.CYAN))
+    print(paint(f"Payload sha1: {payload_hash}", C.CYAN))
     print(paint(f"MTU set: {MTU_SIZES}", C.CYAN))
     print(paint(f"Gap set (ms): {GAP_MS_LIST}", C.CYAN))
 
-    try:
-        for mtu in MTU_SIZES:
-            print_section(f"MTU {mtu} bytes")
-            mtu_key = str(mtu)
-            results.setdefault(mtu_key, [])
+    for mtu in MTU_SIZES:
+        print_section(f"MTU {mtu} bytes")
+        mtu_key = str(mtu)
+        results.setdefault(mtu_key, [])
 
-            for gap_ms in GAP_MS_LIST:
-                for repeat in range(1, REPEATS + 1):
-                    print(
-                        paint(
-                            f"gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
-                            C.BOLD,
-                            C.CYAN,
-                        ),
-                        flush=True,
-                    )
-                    entry = run_one_test(ser, mtu, gap_ms, repeat)
-                    results[mtu_key].append(entry)
-                    save_results(results)
+        for gap_ms in GAP_MS_LIST:
+            for repeat in range(1, REPEATS + 1):
+                print(
+                    paint(
+                        f"gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
+                        C.BOLD,
+                        C.CYAN,
+                    ),
+                    flush=True,
+                )
+                entry = run_one_test(
+                    tx,
+                    payload=payload,
+                    payload_hash=payload_hash,
+                    payload_source=payload_source,
+                    mtu=mtu,
+                    gap_ms=gap_ms,
+                    repeat_idx=repeat,
+                )
+                results[mtu_key].append(entry)
+                save_results(results)
 
-                    print(f"  {fmt_run_result(entry)}")
-                    time.sleep(0.8)
-    finally:
-        ser.close()
+                print(f"  {fmt_run_result(entry)}")
+                time.sleep(0.8)
 
     print_card("Benchmark Complete", f"Results saved to {OUTPUT_FILE}")
 
