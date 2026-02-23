@@ -61,6 +61,24 @@ def print_section(title: str) -> None:
     print(paint(LINE, C.BLUE))
 
 
+def fmt_duration(seconds: float) -> str:
+    total = max(int(seconds), 0)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    if h > 0:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
+
+
+def fmt_speed_bps(bytes_per_s: float) -> str:
+    bps = max(bytes_per_s, 0.0)
+    if bps >= 1024 * 1024:
+        return f"{bps / (1024 * 1024):.2f} MB/s"
+    if bps >= 1024:
+        return f"{bps / 1024:.2f} KB/s"
+    return f"{bps:.1f} B/s"
+
+
 def fmt_run_result(entry: dict) -> str:
     status_ok = not entry["aborted"]
     status = paint("OK", C.BOLD, C.GREEN) if status_ok else paint("ABORT", C.BOLD, C.RED)
@@ -144,6 +162,32 @@ def run_one_test(
             )
         )
 
+    def on_event(event_type: str, payload_event: dict) -> None:
+        if not DEBUG:
+            return
+        if event_type != "report":
+            return
+
+        round_idx = int(payload_event.get("round", 0))
+        pending_before = int(payload_event.get("pending", 0))
+        missing_count = int(payload_event.get("missing", 0))
+
+        burst_size = min(WINDOW_SIZE, pending_before)
+        delivered_this_round = max(burst_size - missing_count, 0)
+        pending_after = max(pending_before - delivered_this_round, 0)
+        done_est = max(chunks_total - pending_after, 0)
+
+        bar = progress_bar(done_est, chunks_total)
+        progress = (done_est / max(chunks_total, 1)) * 100.0
+        print(
+            paint(
+                f"    · r{round_idx:02d}/{effective_max_rounds:02d} "
+                f"{bar} {progress:>5.1f}% "
+                f"pending={pending_after:>5} missing={missing_count:>3}",
+                C.DIM,
+            )
+        )
+
     result = tx.send_bytes(
         payload,
         mtu=mtu,
@@ -155,6 +199,7 @@ def run_one_test(
             "payload_size": len(payload),
             "repeat": repeat_idx,
         },
+        on_event=on_event,
     )
 
     chunks_total = int(result.get("chunks_total", 0))
@@ -219,6 +264,19 @@ def main() -> None:
     print(paint(f"MTU set: {MTU_SIZES}", C.CYAN))
     print(paint(f"Gap set (ms): {GAP_MS_LIST}", C.CYAN))
 
+    total_runs = len(FILE_SIZES_BYTES) * len(MTU_SIZES) * len(GAP_MS_LIST) * REPEATS
+    total_bytes_planned = sum(FILE_SIZES_BYTES) * len(MTU_SIZES) * len(GAP_MS_LIST) * REPEATS
+    completed_runs = 0
+    bytes_done = 0
+    benchmark_start = time.monotonic()
+
+    print(
+        paint(
+            f"Planned runs: {total_runs}  Planned TX bytes: {total_bytes_planned}",
+            C.CYAN,
+        )
+    )
+
     for target_size in FILE_SIZES_BYTES:
         payload, payload_source = build_test_payload(input_path, target_size)
         payload_hash = payload_sha1(payload)
@@ -234,13 +292,30 @@ def main() -> None:
 
             for gap_ms in GAP_MS_LIST:
                 for repeat in range(1, REPEATS + 1):
+                    run_index = completed_runs + 1
+                    elapsed = max(time.monotonic() - benchmark_start, 1e-6)
+                    avg_run_s = elapsed / max(completed_runs, 1)
+                    remaining_runs = total_runs - completed_runs
+                    eta_s = avg_run_s * remaining_runs if completed_runs > 0 else 0.0
+                    avg_speed = bytes_done / elapsed if completed_runs > 0 else 0.0
+                    est_run_s = len(payload) / max(build_expected_throughput(mtu, gap_ms, BAUDRATE), 1e-6)
+
                     print(
                         paint(
-                            f"size={len(payload):>7}B  gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
+                            f"run={run_index}/{total_runs}  size={len(payload):>9}B  "
+                            f"gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
                             C.BOLD,
                             C.CYAN,
                         ),
                         flush=True,
+                    )
+                    print(
+                        paint(
+                            f"  est_run={fmt_duration(est_run_s)}  "
+                            f"avg_speed={fmt_speed_bps(avg_speed)}  "
+                            f"eta={fmt_duration(eta_s)}",
+                            C.DIM,
+                        )
                     )
                     entry = run_one_test(
                         tx,
@@ -254,7 +329,24 @@ def main() -> None:
                     results[mtu_key].append(entry)
                     save_results(results)
 
+                    completed_runs += 1
+                    bytes_done += int(entry.get("bytes_sent", len(payload)))
+
+                    elapsed_post = max(time.monotonic() - benchmark_start, 1e-6)
+                    remaining_post = total_runs - completed_runs
+                    avg_run_post = elapsed_post / max(completed_runs, 1)
+                    eta_post = avg_run_post * remaining_post
+                    avg_speed_post = bytes_done / elapsed_post
+
                     print(f"  {fmt_run_result(entry)}")
+                    print(
+                        paint(
+                            f"  stats: elapsed={fmt_duration(elapsed_post)}  "
+                            f"avg_speed={fmt_speed_bps(avg_speed_post)}  "
+                            f"eta={fmt_duration(eta_post)}",
+                            C.DIM,
+                        )
+                    )
                     time.sleep(0.8)
 
     print_card("Benchmark Complete", f"Results saved to {OUTPUT_FILE}")
