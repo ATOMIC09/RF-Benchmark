@@ -14,7 +14,7 @@ INPUT_FILE: str | None = None
 MTU_SIZES = [64, 128, 160, 256, 512, 1024, 1500]
 GAP_MS_LIST = [0, 1, 2, 3, 5, 7, 10]
 REPEATS = 3
-FILE_SIZE_BYTES = 1 * 1024
+FILE_SIZES_BYTES = [1 * 1024, 4 * 1024, 16 * 1024]
 WINDOW_SIZE = 12
 MAX_ROUNDS = 40
 ACK_TIMEOUT = 5.0
@@ -195,8 +195,8 @@ def main() -> None:
     if input_path is not None and not input_path.exists():
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
-    payload, payload_source = build_test_payload(input_path, FILE_SIZE_BYTES)
-    payload_hash = payload_sha1(payload)
+    if not FILE_SIZES_BYTES:
+        raise ValueError("FILE_SIZES_BYTES cannot be empty")
 
     tx = RF433Transmitter(
         TransmitterConfig(
@@ -213,43 +213,49 @@ def main() -> None:
     time.sleep(2)
     print_card(
         "RF433 Fresh Benchmark TX",
-        f"Port={PORT}  Baud={BAUDRATE}  FileSize={len(payload)}B  Repeats={REPEATS}",
+        f"Port={PORT}  Baud={BAUDRATE}  FileSizes={FILE_SIZES_BYTES}  Repeats={REPEATS}",
     )
     print(paint(f"Output file: {OUTPUT_FILE}", C.CYAN))
-    print(paint(f"Payload source: {payload_source}", C.CYAN))
-    print(paint(f"Payload sha1: {payload_hash}", C.CYAN))
     print(paint(f"MTU set: {MTU_SIZES}", C.CYAN))
     print(paint(f"Gap set (ms): {GAP_MS_LIST}", C.CYAN))
 
-    for mtu in MTU_SIZES:
-        print_section(f"MTU {mtu} bytes")
-        mtu_key = str(mtu)
-        results.setdefault(mtu_key, [])
+    for target_size in FILE_SIZES_BYTES:
+        payload, payload_source = build_test_payload(input_path, target_size)
+        payload_hash = payload_sha1(payload)
 
-        for gap_ms in GAP_MS_LIST:
-            for repeat in range(1, REPEATS + 1):
-                print(
-                    paint(
-                        f"gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
-                        C.BOLD,
-                        C.CYAN,
-                    ),
-                    flush=True,
-                )
-                entry = run_one_test(
-                    tx,
-                    payload=payload,
-                    payload_hash=payload_hash,
-                    payload_source=payload_source,
-                    mtu=mtu,
-                    gap_ms=gap_ms,
-                    repeat_idx=repeat,
-                )
-                results[mtu_key].append(entry)
-                save_results(results)
+        print_section(f"FILE SIZE {len(payload)} bytes")
+        print(paint(f"Payload source: {payload_source}", C.CYAN))
+        print(paint(f"Payload sha1: {payload_hash}", C.CYAN))
 
-                print(f"  {fmt_run_result(entry)}")
-                time.sleep(0.8)
+        for mtu in MTU_SIZES:
+            print_section(f"MTU {mtu} bytes")
+            mtu_key = str(mtu)
+            results.setdefault(mtu_key, [])
+
+            for gap_ms in GAP_MS_LIST:
+                for repeat in range(1, REPEATS + 1):
+                    print(
+                        paint(
+                            f"size={len(payload):>7}B  gap={gap_ms:>3}ms  repeat={repeat}/{REPEATS}",
+                            C.BOLD,
+                            C.CYAN,
+                        ),
+                        flush=True,
+                    )
+                    entry = run_one_test(
+                        tx,
+                        payload=payload,
+                        payload_hash=payload_hash,
+                        payload_source=payload_source,
+                        mtu=mtu,
+                        gap_ms=gap_ms,
+                        repeat_idx=repeat,
+                    )
+                    results[mtu_key].append(entry)
+                    save_results(results)
+
+                    print(f"  {fmt_run_result(entry)}")
+                    time.sleep(0.8)
 
     print_card("Benchmark Complete", f"Results saved to {OUTPUT_FILE}")
 
