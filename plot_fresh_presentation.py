@@ -5,9 +5,9 @@ from statistics import mean
 import matplotlib.pyplot as plt
 import numpy as np
 
-INPUT_FILE = "rf433_results_fresh.json"
-OUT_OVERVIEW = "rf433_presentation_overview.png"
-OUT_TOP = "rf433_presentation_top_configs.png"
+INPUT_FILE = "rf433_results_focus_small.json"
+OUT_OVERVIEW = "rf433_presentation_overview_focus_small.png"
+OUT_TOP = "rf433_presentation_top_configs_focus_small.png"
 FONT_FAMILY = "Niramit"
 LOSS_LIMIT = 2.0
 
