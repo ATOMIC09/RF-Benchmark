@@ -5,10 +5,11 @@ from statistics import mean
 import matplotlib.pyplot as plt
 import numpy as np
 
-INPUT_FILE = "rf433_results_fresh.json"
-OUTPUT_DIR = "rf433_plots_fresh"
+INPUT_FILE = "rf433_results_fresh_ded_at_512_7ms_1024000.json"
+OUTPUT_DIR = "rf433_plots_fresh_ded_at_512_7ms_1024000"
 FONT_FAMILY = "Niramit"
 LOSS_LIMIT = 2.0
+BASE_FONT_SIZE = 14
 
 
 def load_rows(path: str) -> list[dict]:
@@ -62,19 +63,20 @@ def build_matrix(rows: list[dict], key: str, mtus: list[int], gaps: list[int]) -
 
 def add_heatmap(ax, matrix: np.ndarray, title: str, mtus: list[int], gaps: list[int], cmap: str):
     im = ax.imshow(matrix, cmap=cmap, aspect="auto")
-    ax.set_title(title, fontweight="bold", fontsize=12)
-    ax.set_xlabel("MTU (bytes)", fontweight="bold")
-    ax.set_ylabel("Gap (ms)", fontweight="bold")
+    ax.set_title(title, fontweight="bold", fontsize=20)
+    ax.set_xlabel("MTU (bytes)", fontweight="bold", fontsize=16)
+    ax.set_ylabel("Gap (ms)", fontweight="bold", fontsize=16)
     ax.set_xticks(range(len(mtus)))
     ax.set_xticklabels(mtus)
     ax.set_yticks(range(len(gaps)))
     ax.set_yticklabels(gaps)
+    ax.tick_params(axis="both", labelsize=14)
 
     for i in range(len(gaps)):
         for j in range(len(mtus)):
             value = matrix[i, j]
             if not np.isnan(value):
-                ax.text(j, i, f"{value:.0f}", ha="center", va="center", fontsize=8)
+                ax.text(j, i, f"{value:.0f}", ha="center", va="center", fontsize=12)
 
     return im
 
@@ -99,7 +101,7 @@ def make_overview(rows: list[dict], file_size: int, out_path: str) -> None:
     fig, axes = plt.subplots(2, 2, figsize=(16, 10))
     fig.suptitle(
         f"RF433 Benchmark Overview (size={size_label(file_size)}, 9600 baud)",
-        fontsize=18,
+        fontsize=28,
         fontweight="bold",
     )
 
@@ -138,14 +140,15 @@ def make_top_configs(rows: list[dict], file_size: int, out_path: str) -> None:
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
     ax.invert_yaxis()
-    ax.set_xlabel("B/s", fontweight="bold")
+    ax.set_xlabel("B/s", fontweight="bold", fontsize=16)
     ax.set_title(
         f"Top 10 Configurations (size={size_label(file_size)})",
-        fontsize=15,
+        fontsize=24,
         fontweight="bold",
     )
+    ax.tick_params(axis="both", labelsize=14)
     ax.grid(axis="x", linestyle="--", alpha=0.3)
-    ax.legend(loc="lower right")
+    ax.legend(loc="lower right", fontsize=14)
 
     for i, r in enumerate(top):
         ax.text(
@@ -153,7 +156,7 @@ def make_top_configs(rows: list[dict], file_size: int, out_path: str) -> None:
             i,
             f"crc={r['avg_crc']:.1f}% to={r['avg_timeouts']:.1f}",
             va="center",
-            fontsize=9,
+            fontsize=12,
         )
 
     plt.tight_layout()
@@ -185,10 +188,11 @@ def make_filesize_summary(rows: list[dict], out_path: str) -> None:
 
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
-    ax.set_ylabel("B/s", fontweight="bold")
-    ax.set_title("Best Configuration by File Size", fontsize=15, fontweight="bold")
+    ax.set_ylabel("B/s", fontweight="bold", fontsize=16)
+    ax.set_title("Best Configuration by File Size", fontsize=24, fontweight="bold")
+    ax.tick_params(axis="both", labelsize=14)
     ax.grid(axis="y", linestyle="--", alpha=0.3)
-    ax.legend()
+    ax.legend(fontsize=14)
 
     for idx, row in enumerate(best_per_size):
         ax.text(
@@ -196,7 +200,7 @@ def make_filesize_summary(rows: list[dict], out_path: str) -> None:
             robust_vals[idx] + 5,
             f"MTU {row['mtu']} / {row['gap_ms']}ms",
             ha="center",
-            fontsize=9,
+            fontsize=12,
         )
 
     plt.tight_layout()
@@ -206,7 +210,7 @@ def make_filesize_summary(rows: list[dict], out_path: str) -> None:
 
 def main() -> None:
     plt.rcParams["font.family"] = FONT_FAMILY
-    plt.rcParams["font.size"] = 10
+    plt.rcParams["font.size"] = BASE_FONT_SIZE
 
     rows = load_rows(INPUT_FILE)
     if not rows:
